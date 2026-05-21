@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import SignOutButton from "./sign-out-button";
 import Dashboard from "@/components/dashboard";
 
 export default async function Home() {
@@ -13,15 +12,6 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-bg-primary">
-      {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
-        <span className="text-base font-semibold text-text-primary">
-          Tradent
-        </span>
-        <SignOutButton />
-      </header>
-
-      {/* Dashboard Content */}
       <Dashboard />
 
       {/* Footer */}
