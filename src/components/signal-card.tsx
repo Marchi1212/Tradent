@@ -20,6 +20,7 @@ export default function SignalCard({ signal }: { signal: Signal }) {
   const [budget, setBudget] = useState("");
   const [positionOpened, setPositionOpened] = useState(false);
 
+  const isBold = signal.riskClass === "bold";
   const marketStatus = getMarketStatusLabel(signal.marketStatus);
   const budgetNum = parseFloat(budget) || 0;
   const expectedGainEuro = ((budgetNum * signal.expectedGainPercent) / 100).toFixed(2);
@@ -35,56 +36,82 @@ export default function SignalCard({ signal }: { signal: Signal }) {
     setShowBudget(false);
   }
 
+  // Color scheme based on risk class
+  const colors = isBold
+    ? {
+        bg: "bg-[#1A1A1A]",
+        text: "text-white",
+        textSecondary: "text-white/60",
+        textMuted: "text-white/40",
+        border: "border-white/10",
+        dot: marketStatus.dot,
+        inputBg: "bg-white/10",
+        inputBorder: "border-white/15",
+        inputFocus: "focus:border-white/30",
+        btnBg: "bg-white",
+        btnText: "text-[#1A1A1A]",
+        btnHover: "hover:bg-white/90",
+        btnOutline: "bg-transparent border border-white/20 text-white hover:border-white/40",
+        positive: "text-[#34D399]",
+        negative: "text-[#F87171]",
+      }
+    : {
+        bg: "bg-bg-card",
+        text: "text-text-primary",
+        textSecondary: "text-text-secondary",
+        textMuted: "text-text-muted",
+        border: "border-border",
+        dot: marketStatus.dot,
+        inputBg: "bg-bg-primary",
+        inputBorder: "border-border",
+        inputFocus: "focus:border-text-muted",
+        btnBg: "bg-accent",
+        btnText: "text-white",
+        btnHover: "hover:bg-accent-hover",
+        btnOutline: "bg-transparent border border-border text-text-primary hover:border-border-hover",
+        positive: "text-positive",
+        negative: "text-negative",
+      };
+
   return (
-    <div className="rounded-[--radius-lg] bg-bg-card overflow-hidden">
+    <div className={`rounded-[--radius-lg] ${colors.bg} overflow-hidden`}>
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-5 py-5 text-left"
       >
-        {/* Label Row */}
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-text-muted">
-            {signal.riskClass === "steady" ? "Steady" : "Bold"}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${marketStatus.dot}`} />
-            <span className="text-[11px] text-text-muted">
-              {marketStatus.text}
-            </span>
-          </div>
-        </div>
-
-        {/* Asset Row */}
-        <div className="flex items-center justify-between">
+        {/* Top: Asset + Direction + Confidence */}
+        <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-text-primary">
+            <h3 className={`text-xl font-bold ${colors.text}`}>
               {signal.asset}
             </h3>
-            <p className="text-sm text-text-secondary mt-0.5">
-              {signal.category} · {signal.direction} · Hebel {signal.leverage}
+            <p className={`text-sm ${colors.textSecondary} mt-1`}>
+              {signal.direction} · {signal.category} · {signal.leverage}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-semibold text-text-primary">
+            <p className={`text-3xl font-black ${colors.text}`}>
               {signal.confidence}%
             </p>
-            <p className="text-[11px] text-text-muted">Konfidenz</p>
           </div>
         </div>
 
-        {/* Expected Gain */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-          <div>
-            <p className="text-[11px] text-text-muted uppercase">Erwarteter Gewinn</p>
-            <p className="text-sm text-text-primary mt-0.5">
-              <span className="text-positive font-semibold">+{signal.expectedGainPercent}%</span>
-              <span className="text-text-muted"> · bei 50€ → </span>
-              <span className="font-semibold">+{((50 * signal.expectedGainPercent) / 100).toFixed(2)}€</span>
-            </p>
+        {/* Bottom: Expected Gain + Market Status + Chevron */}
+        <div className="flex items-center justify-between mt-5">
+          <div className="flex items-center gap-4">
+            <span className={`text-sm font-semibold ${colors.positive}`}>
+              +{signal.expectedGainPercent}%
+            </span>
+            <div className="flex items-center gap-1.5">
+              <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+              <span className={`text-xs ${colors.textMuted}`}>
+                {marketStatus.text}
+              </span>
+            </div>
           </div>
           <svg
-            className={`w-5 h-5 text-text-muted transition-transform ${expanded ? "rotate-180" : ""}`}
+            className={`w-5 h-5 ${colors.textMuted} transition-transform ${expanded ? "rotate-180" : ""}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -97,65 +124,64 @@ export default function SignalCard({ signal }: { signal: Signal }) {
 
       {/* Expanded View */}
       {expanded && (
-        <div className="px-5 pb-5 space-y-4">
+        <div className={`px-5 pb-5 space-y-4 border-t ${colors.border} pt-4`}>
           {/* Entry / SL / TP */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <p className="text-[11px] text-text-muted uppercase">Einstieg</p>
-              <p className="text-base font-semibold text-text-primary mt-1">
+              <p className={`text-[11px] ${colors.textMuted} uppercase`}>Einstieg</p>
+              <p className={`text-base font-bold ${colors.text} mt-1`}>
                 {signal.entry.toLocaleString("de-DE")}
               </p>
             </div>
             <div>
-              <p className="text-[11px] text-text-muted uppercase">Stop-Loss</p>
-              <p className="text-base font-semibold text-negative mt-1">
+              <p className={`text-[11px] ${colors.textMuted} uppercase`}>Stop-Loss</p>
+              <p className={`text-base font-bold ${colors.negative} mt-1`}>
                 {signal.stopLoss.toLocaleString("de-DE")}
               </p>
             </div>
             <div>
-              <p className="text-[11px] text-text-muted uppercase">Take-Profit</p>
-              <p className="text-base font-semibold text-positive mt-1">
+              <p className={`text-[11px] ${colors.textMuted} uppercase`}>Take-Profit</p>
+              <p className={`text-base font-bold ${colors.positive} mt-1`}>
                 {signal.takeProfit.toLocaleString("de-DE")}
               </p>
             </div>
           </div>
 
           {/* Timing */}
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border">
+          <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${colors.border}`}>
             <div>
-              <p className="text-[11px] text-text-muted uppercase">Bester Einstieg</p>
-              <p className="text-sm text-text-primary mt-1">{signal.optimalEntry}</p>
+              <p className={`text-[11px] ${colors.textMuted} uppercase`}>Bester Einstieg</p>
+              <p className={`text-sm font-semibold ${colors.text} mt-1`}>{signal.optimalEntry}</p>
             </div>
             <div>
-              <p className="text-[11px] text-text-muted uppercase">Markt schließt</p>
-              <p className="text-sm text-text-primary mt-1">{signal.marketCloseTime}</p>
+              <p className={`text-[11px] ${colors.textMuted} uppercase`}>Markt schließt</p>
+              <p className={`text-sm font-semibold ${colors.text} mt-1`}>{signal.marketCloseTime}</p>
             </div>
           </div>
 
           {/* Reasoning */}
-          <div className="pt-4 border-t border-border">
-            <p className="text-[11px] text-text-muted uppercase mb-2">Begründung</p>
-            <p className="text-sm text-text-secondary leading-relaxed">
+          <div className={`pt-4 border-t ${colors.border}`}>
+            <p className={`text-[11px] ${colors.textMuted} uppercase mb-2`}>Begründung</p>
+            <p className={`text-sm ${colors.textSecondary} leading-relaxed`}>
               {signal.reasoning}
             </p>
           </div>
 
-          {/* Risk Info */}
-          <div className="pt-4 border-t border-border">
-            <p className="text-[11px] text-text-muted uppercase mb-1">Risiko</p>
-            <p className="text-sm text-text-secondary">
+          {/* Risk */}
+          <div className={`pt-4 border-t ${colors.border}`}>
+            <p className={`text-sm ${colors.textSecondary}`}>
               Chance/Risiko {signal.riskRewardRatio} · Max. Verlust{" "}
-              <span className="text-negative">{maxLossPercent.toFixed(1)}%</span>
+              <span className={`font-semibold ${colors.negative}`}>{maxLossPercent.toFixed(1)}%</span>
             </p>
           </div>
 
           {/* Position eröffnen */}
           {!positionOpened ? (
-            <div className="pt-4 border-t border-border">
+            <div className={`pt-4 border-t ${colors.border}`}>
               {!showBudget ? (
                 <button
                   onClick={() => setShowBudget(true)}
-                  className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+                  className={`w-full rounded-[--radius-md] ${colors.btnBg} py-3.5 text-sm font-bold ${colors.btnText} transition-colors ${colors.btnHover}`}
                 >
                   Position eröffnen
                 </button>
@@ -167,30 +193,30 @@ export default function SignalCard({ signal }: { signal: Signal }) {
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
                       placeholder="Budget in €"
-                      className="flex-1 rounded-[--radius-md] bg-bg-primary border border-border px-4 py-3 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
+                      className={`flex-1 rounded-[--radius-md] ${colors.inputBg} border ${colors.inputBorder} px-4 py-3 text-sm ${colors.text} placeholder:${colors.textMuted} outline-none transition-colors ${colors.inputFocus}`}
                       autoFocus
                     />
                     <button
                       onClick={handleOpenPosition}
                       disabled={budgetNum <= 0}
-                      className="rounded-[--radius-md] bg-accent px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-30"
+                      className={`rounded-[--radius-md] ${colors.btnBg} px-6 py-3 text-sm font-bold ${colors.btnText} transition-colors ${colors.btnHover} disabled:opacity-30`}
                     >
-                      Bestätigen
+                      OK
                     </button>
                   </div>
                   {budgetNum > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">
-                        Gewinn: <span className="text-positive font-medium">+{expectedGainEuro}€</span>
+                    <div className={`flex justify-between text-sm ${colors.textSecondary}`}>
+                      <span>
+                        Gewinn: <span className={`font-semibold ${colors.positive}`}>+{expectedGainEuro}€</span>
                       </span>
-                      <span className="text-text-secondary">
-                        Verlust: <span className="text-negative font-medium">-{maxLossEuro}€</span>
+                      <span>
+                        Verlust: <span className={`font-semibold ${colors.negative}`}>-{maxLossEuro}€</span>
                       </span>
                     </div>
                   )}
                   <button
                     onClick={() => { setShowBudget(false); setBudget(""); }}
-                    className="w-full text-sm text-text-muted hover:text-text-secondary"
+                    className={`w-full text-sm ${colors.textMuted}`}
                   >
                     Abbrechen
                   </button>
@@ -198,16 +224,16 @@ export default function SignalCard({ signal }: { signal: Signal }) {
               )}
             </div>
           ) : (
-            <div className="pt-4 border-t border-border space-y-3">
+            <div className={`pt-4 border-t ${colors.border} space-y-3`}>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-text-primary">
+                <span className={`text-sm font-bold ${colors.text}`}>
                   Position aktiv
                 </span>
-                <span className="text-sm text-text-secondary">
+                <span className={`text-sm ${colors.textSecondary}`}>
                   {parseFloat(budget).toFixed(2)}€
                 </span>
               </div>
-              <button className="w-full rounded-[--radius-md] bg-bg-primary border border-border py-3.5 text-sm font-semibold text-text-primary transition-colors hover:border-border-hover">
+              <button className={`w-full rounded-[--radius-md] py-3.5 text-sm font-bold transition-colors ${colors.btnOutline}`}>
                 Position schließen
               </button>
             </div>
