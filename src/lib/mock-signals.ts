@@ -23,8 +23,9 @@ export interface Signal {
   category: string;
 }
 
-export const mockSignals: Signal[] = [
-  {
+// Pro Tag genau 2 Signale: 1x Steady, 1x Bold
+export const todaySignals: { steady: Signal; bold: Signal } = {
+  steady: {
     id: "1",
     asset: "DAX 40",
     ticker: "DE40",
@@ -45,7 +46,7 @@ export const mockSignals: Signal[] = [
     optimalEntry: "09:00–11:00",
     category: "Index",
   },
-  {
+  bold: {
     id: "2",
     asset: "Tesla",
     ticker: "TSLA.US",
@@ -66,46 +67,4 @@ export const mockSignals: Signal[] = [
     optimalEntry: "15:30–17:00",
     category: "Aktie",
   },
-  {
-    id: "3",
-    asset: "Bitcoin",
-    ticker: "BTC",
-    direction: "SHORT",
-    riskClass: "bold",
-    leverage: "4x",
-    entry: 68500,
-    stopLoss: 70200,
-    takeProfit: 64800,
-    confidence: 63,
-    expectedGainPercent: 21.6,
-    riskRewardRatio: "1:2.2",
-    reasoning:
-      "Doppel-Top bei $69.000 gebildet. RSI überkauft bei 74. On-Chain-Daten zeigen erhöhte Wallet-Transfers zu Börsen. Kurzfristige Korrektur wahrscheinlich.",
-    market: "Krypto",
-    marketStatus: "open",
-    marketCloseTime: "24/7",
-    optimalEntry: "Jederzeit",
-    category: "Krypto",
-  },
-  {
-    id: "4",
-    asset: "S&P 500",
-    ticker: "US500",
-    direction: "LONG",
-    riskClass: "steady",
-    leverage: "2x",
-    entry: 5320,
-    stopLoss: 5275,
-    takeProfit: 5410,
-    confidence: 82,
-    expectedGainPercent: 3.4,
-    riskRewardRatio: "1:2",
-    reasoning:
-      "Index hält sich stabil über der 20-Tage-Linie. Fed-Zinsentscheid letzte Woche positiv aufgenommen. Saisonalität spricht für weiteren Anstieg.",
-    market: "NYSE",
-    marketStatus: "opening-soon",
-    marketCloseTime: "22:00",
-    optimalEntry: "15:30–17:00",
-    category: "Index",
-  },
-];
+};
