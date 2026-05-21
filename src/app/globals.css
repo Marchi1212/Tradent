@@ -1,26 +1,25 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Trade Republic inspired palette */
-  --color-bg-primary: #0D0D0D;
-  --color-bg-secondary: #191919;
-  --color-bg-card: #1E1E1E;
-  --color-bg-elevated: #252525;
+  /* Light, clean palette – Trade Republic inspired */
+  --color-bg-primary: #FFFFFF;
+  --color-bg-secondary: #F6F6F6;
+  --color-bg-card: #F6F6F6;
+  --color-bg-elevated: #EFEFEF;
 
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #909090;
-  --color-text-muted: #606060;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #6B6B6B;
+  --color-text-muted: #9B9B9B;
 
-  --color-accent: #0057FF;
-  --color-accent-hover: #003ECB;
-  --color-accent-active: #002F9A;
+  --color-accent: #1A1A1A;
+  --color-accent-hover: #333333;
 
-  --color-positive: #028901;
-  --color-negative: #D00D00;
-  --color-warning: #F97C00;
+  --color-positive: #0CBB6F;
+  --color-negative: #E23636;
+  --color-warning: #F5A623;
 
-  --color-border: #2A2A2A;
-  --color-border-hover: #3A3A3A;
+  --color-border: #E8E8E8;
+  --color-border-hover: #D0D0D0;
 
   /* Font */
   --font-sans: var(--font-inter);
@@ -38,22 +37,4 @@ body {
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-hover);
 }

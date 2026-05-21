@@ -34,23 +34,23 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg-primary px-6">
-      <div className="w-full max-w-sm space-y-8">
+      <div className="w-full max-w-sm space-y-10">
         {/* Brand */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">T</span>
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-text-primary">
             Tradent
           </h1>
+          <p className="text-sm text-text-secondary mt-2">
+            Dein täglicher Trading-Advisor
+          </p>
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label
               htmlFor="email"
-              className="block text-sm text-text-secondary mb-1.5"
+              className="block text-sm text-text-primary mb-2"
             >
               Email
             </label>
@@ -60,7 +60,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-[--radius-md] bg-bg-card border border-border px-4 py-3 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent"
+              className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
               placeholder="name@email.de"
             />
           </div>
@@ -68,7 +68,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm text-text-secondary mb-1.5"
+              className="block text-sm text-text-primary mb-2"
             >
               Passwort
             </label>
@@ -78,7 +78,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-[--radius-md] bg-bg-card border border-border px-4 py-3 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-accent"
+              className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
               placeholder="••••••••"
             />
           </div>
@@ -90,7 +90,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-[--radius-md] bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover active:bg-accent-active disabled:opacity-50"
+            className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             {loading ? "Anmelden..." : "Anmelden"}
           </button>
