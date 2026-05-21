@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
-import type { Session } from "@/lib/session-store";
-import { calculatePositionSize } from "@/lib/session-store";
+import type { Portfolio } from "@/lib/portfolio-store";
+import { calculatePositionSize } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 
 function ClockIcon({ className }: { className?: string }) {
@@ -17,10 +17,10 @@ function ClockIcon({ className }: { className?: string }) {
 
 export default function SignalCard({
   signal,
-  session,
+  portfolio,
 }: {
   signal: Signal;
-  session: Session;
+  portfolio: Portfolio | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [positionOpened, setPositionOpened] = useState(false);
@@ -34,25 +34,20 @@ export default function SignalCard({
   }, [signal.market]);
 
   const isBold = signal.riskClass === "bold";
-  const riskPercent = isBold ? session.riskBold : session.riskSteady;
+  const hasPortfolio = portfolio !== null;
 
-  // Stop-Loss Abstand in %
+  // Position sizing nur mit Portfolio
+  const riskPercent = hasPortfolio ? (isBold ? portfolio.riskBold : portfolio.riskSteady) : 0;
   const slPercent =
     signal.direction === "LONG"
       ? ((signal.entry - signal.stopLoss) / signal.entry) * 100
       : ((signal.stopLoss - signal.entry) / signal.entry) * 100;
-
   const leverage = parseFloat(signal.leverage);
 
-  // Empfohlener Einsatz
-  const recommendedBudget = calculatePositionSize(
-    session.currentBalance,
-    riskPercent,
-    slPercent,
-    leverage
-  );
-
-  const maxLoss = session.currentBalance * (riskPercent / 100);
+  const recommendedBudget = hasPortfolio
+    ? calculatePositionSize(portfolio.currentBalance, riskPercent, slPercent, leverage)
+    : 0;
+  const maxLoss = hasPortfolio ? portfolio.currentBalance * (riskPercent / 100) : 0;
   const expectedGainEuro = (recommendedBudget * signal.expectedGainPercent / 100).toFixed(2);
 
   function handleOpenPosition() {
@@ -122,14 +117,18 @@ export default function SignalCard({
           {signal.direction} · {signal.category} · {signal.leverage}
         </p>
 
-        {/* Expected Gain + Recommended Budget */}
+        {/* Expected Gain */}
         <div className="flex items-center justify-between mt-5">
           <p className={`text-sm ${c.textSec}`}>
             <span className={`font-bold ${c.pos}`}>+{signal.expectedGainPercent}%</span>
-            <span className={c.textMut}> · </span>
-            <span className={`font-bold ${c.text}`}>{recommendedBudget.toFixed(0)}€</span>
-            <span className={c.textMut}> → </span>
-            <span className={`font-bold ${c.pos}`}>+{expectedGainEuro}€</span>
+            {hasPortfolio && (
+              <>
+                <span className={c.textMut}> · </span>
+                <span className={`font-bold ${c.text}`}>{recommendedBudget.toFixed(0)}€</span>
+                <span className={c.textMut}> → </span>
+                <span className={`font-bold ${c.pos}`}>+{expectedGainEuro}€</span>
+              </>
+            )}
           </p>
           <svg
             className={`w-5 h-5 ${c.textMut} transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -202,28 +201,32 @@ export default function SignalCard({
             </div>
           </div>
 
-          {/* Position eröffnen */}
-          {!positionOpened ? (
-            <div className={`pt-4 border-t ${c.border}`}>
-              <button
-                onClick={handleOpenPosition}
-                className={`w-full rounded-[--radius-md] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
-              >
-                Position eröffnen · {recommendedBudget.toFixed(0)}€
-              </button>
-            </div>
-          ) : (
-            <div className={`pt-4 border-t ${c.border} space-y-3`}>
-              <div className="flex items-center justify-between">
-                <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
-                <span className={`text-sm ${c.textSec}`}>{recommendedBudget.toFixed(0)}€</span>
-              </div>
-              <button
-                className={`w-full rounded-[--radius-md] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
-              >
-                Position schließen
-              </button>
-            </div>
+          {/* Position eröffnen – nur mit Portfolio */}
+          {hasPortfolio && (
+            <>
+              {!positionOpened ? (
+                <div className={`pt-4 border-t ${c.border}`}>
+                  <button
+                    onClick={handleOpenPosition}
+                    className={`w-full rounded-[--radius-md] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                  >
+                    Position eröffnen · {recommendedBudget.toFixed(0)}€
+                  </button>
+                </div>
+              ) : (
+                <div className={`pt-4 border-t ${c.border} space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
+                    <span className={`text-sm ${c.textSec}`}>{recommendedBudget.toFixed(0)}€</span>
+                  </div>
+                  <button
+                    className={`w-full rounded-[--radius-md] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
+                  >
+                    Position schließen
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

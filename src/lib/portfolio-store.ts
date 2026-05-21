@@ -1,18 +1,18 @@
 "use client";
 
-export interface Session {
+export interface Portfolio {
   id: string;
   name: string;
   budget: number;
   currentBalance: number;
-  riskSteady: number; // Prozent, z.B. 2
-  riskBold: number; // Prozent, z.B. 5
+  riskSteady: number;
+  riskBold: number;
   createdAt: string;
 }
 
 export interface Trade {
   id: string;
-  sessionId: string;
+  portfolioId: string;
   signalId: string;
   asset: string;
   direction: string;
@@ -22,48 +22,44 @@ export interface Trade {
   leverage: string;
   budget: number;
   status: "open" | "closed";
-  result?: number; // Gewinn/Verlust in €
+  result?: number;
   openedAt: string;
   closedAt?: string;
 }
 
-// Für Phase 1: Local State Management
-// Phase 2: Supabase Datenbank
-
-const SESSION_KEY = "tradent_sessions";
-const ACTIVE_SESSION_KEY = "tradent_active_session";
+const PORTFOLIO_KEY = "tradent_portfolios";
+const ACTIVE_KEY = "tradent_active_portfolio";
 const TRADES_KEY = "tradent_trades";
 
 function isBrowser() {
   return typeof window !== "undefined";
 }
 
-export function getSessions(): Session[] {
+export function getPortfolios(): Portfolio[] {
   if (!isBrowser()) return [];
-  const data = localStorage.getItem(SESSION_KEY);
+  const data = localStorage.getItem(PORTFOLIO_KEY);
   return data ? JSON.parse(data) : [];
 }
 
-export function getActiveSession(): Session | null {
+export function getActivePortfolio(): Portfolio | null {
   if (!isBrowser()) return null;
-  const id = localStorage.getItem(ACTIVE_SESSION_KEY);
+  const id = localStorage.getItem(ACTIVE_KEY);
   if (!id) return null;
-  const sessions = getSessions();
-  return sessions.find((s) => s.id === id) || null;
+  return getPortfolios().find((p) => p.id === id) || null;
 }
 
-export function setActiveSession(id: string) {
+export function setActivePortfolio(id: string) {
   if (!isBrowser()) return;
-  localStorage.setItem(ACTIVE_SESSION_KEY, id);
+  localStorage.setItem(ACTIVE_KEY, id);
 }
 
-export function createSession(data: {
+export function createPortfolio(data: {
   name: string;
   budget: number;
   riskSteady: number;
   riskBold: number;
-}): Session {
-  const session: Session = {
+}): Portfolio {
+  const portfolio: Portfolio = {
     id: crypto.randomUUID(),
     name: data.name,
     budget: data.budget,
@@ -73,24 +69,23 @@ export function createSession(data: {
     createdAt: new Date().toISOString(),
   };
 
-  const sessions = getSessions();
-  sessions.push(session);
-  localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
-  setActiveSession(session.id);
+  const portfolios = getPortfolios();
+  portfolios.push(portfolio);
+  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolios));
+  setActivePortfolio(portfolio.id);
 
-  return session;
+  return portfolio;
 }
 
-export function updateSession(
+export function updatePortfolio(
   id: string,
-  updates: Partial<Pick<Session, "name" | "budget" | "currentBalance" | "riskSteady" | "riskBold">>
+  updates: Partial<Pick<Portfolio, "name" | "budget" | "currentBalance" | "riskSteady" | "riskBold">>
 ) {
-  const sessions = getSessions();
-  const index = sessions.findIndex((s) => s.id === id);
+  const portfolios = getPortfolios();
+  const index = portfolios.findIndex((p) => p.id === id);
   if (index === -1) return;
-
-  sessions[index] = { ...sessions[index], ...updates };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
+  portfolios[index] = { ...portfolios[index], ...updates };
+  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolios));
 }
 
 export function calculatePositionSize(
@@ -99,21 +94,17 @@ export function calculatePositionSize(
   stopLossPercent: number,
   leverage: number
 ): number {
-  // Max Verlust in €
   const maxLoss = balance * (riskPercent / 100);
-  // Effektives Risiko pro Position = Stop-Loss% * Leverage
   const effectiveRisk = stopLossPercent * leverage;
-  // Position Size = Max Verlust / Effektives Risiko
   const positionSize = maxLoss / (effectiveRisk / 100);
-  // Nie mehr als das verfügbare Kapital
   return Math.min(positionSize, balance);
 }
 
-export function getTrades(sessionId: string): Trade[] {
+export function getTrades(portfolioId: string): Trade[] {
   if (!isBrowser()) return [];
   const data = localStorage.getItem(TRADES_KEY);
   const trades: Trade[] = data ? JSON.parse(data) : [];
-  return trades.filter((t) => t.sessionId === sessionId);
+  return trades.filter((t) => t.portfolioId === portfolioId);
 }
 
 export function addTrade(trade: Omit<Trade, "id" | "openedAt">): Trade {
@@ -122,11 +113,9 @@ export function addTrade(trade: Omit<Trade, "id" | "openedAt">): Trade {
     id: crypto.randomUUID(),
     openedAt: new Date().toISOString(),
   };
-
   const data = localStorage.getItem(TRADES_KEY);
   const trades: Trade[] = data ? JSON.parse(data) : [];
   trades.push(newTrade);
   localStorage.setItem(TRADES_KEY, JSON.stringify(trades));
-
   return newTrade;
 }
