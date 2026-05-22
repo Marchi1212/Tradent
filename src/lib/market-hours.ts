@@ -18,6 +18,8 @@ export function getMarketInfo(market: string) {
   const now = new Date();
   const currentHour = now.getHours() + now.getMinutes() / 60;
 
+  const totalTradingSeconds = Math.floor((hours.close - hours.open) * 3600);
+
   // Krypto ist immer offen
   if (market === "Krypto") {
     return {
@@ -25,12 +27,18 @@ export function getMarketInfo(market: string) {
       canStillEnter: true,
       timerLabel: "24/7 geöffnet",
       timerSeconds: null,
+      closeSeconds: null,
+      totalTradingSeconds,
     };
   }
 
   const isOpen = currentHour >= hours.open && currentHour < hours.close;
   const lastEntry = hours.close - MIN_HOURS_BEFORE_CLOSE;
   const canStillEnter = isOpen && currentHour < lastEntry;
+
+  const closeSeconds = isOpen
+    ? Math.floor((hours.close - currentHour) * 3600)
+    : null;
 
   if (!isOpen) {
     // Markt geschlossen → Timer bis Öffnung
@@ -48,6 +56,8 @@ export function getMarketInfo(market: string) {
       canStillEnter: false,
       timerLabel: "Öffnet in",
       timerSeconds: totalSeconds,
+      closeSeconds: null,
+      totalTradingSeconds,
     };
   }
 
@@ -61,6 +71,8 @@ export function getMarketInfo(market: string) {
       canStillEnter: false,
       timerLabel: "Schließt in",
       timerSeconds: totalSeconds,
+      closeSeconds,
+      totalTradingSeconds,
     };
   }
 
@@ -73,6 +85,8 @@ export function getMarketInfo(market: string) {
     canStillEnter: true,
     timerLabel: "Einstieg noch",
     timerSeconds: totalSeconds,
+    closeSeconds,
+    totalTradingSeconds,
   };
 }
 

@@ -42,11 +42,13 @@ export default function SignalCard({
   const [revalError, setRevalError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Bei offener Position jede Sekunde updaten (für smooth Countdown-Balken)
+    const ms = positionOpened ? 1000 : 30000;
     const interval = setInterval(() => {
       setMarketInfo(getMarketInfo(signal.market));
-    }, 30000);
+    }, ms);
     return () => clearInterval(interval);
-  }, [signal.market]);
+  }, [signal.market, positionOpened]);
 
   const isBold = signal.riskClass === "bold";
   const hasPortfolio = portfolio !== null && allocatedBudget > 0;
@@ -174,25 +176,55 @@ export default function SignalCard({
 
   return (
     <div className={`rounded-[12px] ${c.bg} overflow-hidden`}>
+      {/* Position aktiv: Countdown-Balken */}
+      {positionOpened && marketInfo.closeSeconds !== null && (
+        <div className="px-5 pt-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className={`text-xs font-bold ${c.text}`}>Position läuft</span>
+            <span className={`text-xs font-medium ${c.timerText}`}>
+              schließt in {formatTimer(marketInfo.closeSeconds)}
+            </span>
+          </div>
+          <div className={`w-full h-1.5 rounded-full ${isBold ? "bg-white/10" : "bg-border"}`}>
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                marketInfo.closeSeconds < 3600
+                  ? "bg-red-500"
+                  : marketInfo.closeSeconds < 7200
+                    ? "bg-amber-500"
+                    : isBold ? "bg-white" : "bg-text-primary"
+              }`}
+              style={{
+                width: `${Math.max(2, (marketInfo.closeSeconds / marketInfo.totalTradingSeconds) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-5 py-5 text-left"
       >
-        {/* Top Row: Direction/Category/Leverage links, Timer rechts */}
-        <div className="flex items-center justify-between mb-3">
-          <p className={`text-sm font-bold ${c.text}`}>
-            {signal.direction} · {signal.category} · {signal.leverage}
-          </p>
-          <div className="flex items-center gap-1.5">
-            <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
-            <span className={`text-xs font-medium ${c.timerText}`}>
-              {marketInfo.timerSeconds !== null
-                ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
-                : marketInfo.timerLabel}
-            </span>
+        {/* Timer oben rechts – nur wenn keine Position aktiv */}
+        {!positionOpened && (
+          <div className="flex justify-end mb-3">
+            <div className="flex items-center gap-1.5">
+              <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
+              <span className={`text-xs font-medium ${c.timerText}`}>
+                {marketInfo.timerSeconds !== null
+                  ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
+                  : marketInfo.timerLabel}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Direction / Category / Leverage – direkt über Asset */}
+        <p className={`text-sm font-bold ${c.text} mb-1`}>
+          {signal.direction} · {signal.category} · {signal.leverage}
+        </p>
 
         {/* Asset + Confidence */}
         <div className="flex items-end justify-between">
