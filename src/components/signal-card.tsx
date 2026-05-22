@@ -32,7 +32,7 @@ function CopyButton({ value, className }: { value: string; className?: string })
           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>
       ) : (
-        <svg className="w-3.5 h-3.5 text-white/30 hover:text-white/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="w-3.5 h-3.5 text-white hover:text-white/80 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
         </svg>
       )}
@@ -43,7 +43,7 @@ function CopyButton({ value, className }: { value: string; className?: string })
 function CopyableValue({ label, value, displayValue }: { label: string; value: string; displayValue?: string }) {
   return (
     <div>
-      <p className="text-[11px] text-white/40 uppercase">{label}</p>
+      <p className="text-[13px] text-white/55 uppercase">{label}</p>
       <div className="flex items-center gap-1.5 mt-1">
         <p className="text-base font-bold text-white">{displayValue || value}</p>
         <CopyButton value={value} />
@@ -255,13 +255,13 @@ export default function SignalCard({
     bg: "bg-[#1A1A1A]",
     text: "text-white",
     textSec: "text-white/60",
-    textMut: "text-white/40",
+    textMut: "text-white/55",
     border: "border-white/10",
     btnBg: "bg-white",
     btnText: "text-[#1A1A1A]",
     btnHover: "hover:bg-white/90",
     btnOutline: "border border-white/20 text-white hover:border-white/40",
-    timerText: "text-white/50",
+    timerText: "text-white/55",
     gainBg: "bg-[#2A2A2A]",
   };
 
@@ -271,8 +271,8 @@ export default function SignalCard({
       {positionOpened && marketInfo.closeSeconds !== null && (
         <div className="px-5 pt-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className={`text-xs font-bold ${c.text}`}>Position läuft</span>
-            <span className={`text-xs font-medium ${c.timerText}`}>
+            <span className={`text-[13px] font-bold ${c.text}`}>Position läuft</span>
+            <span className={`text-[13px] font-medium ${c.timerText}`}>
               schließt in {formatTimer(marketInfo.closeSeconds)}
             </span>
           </div>
@@ -306,7 +306,7 @@ export default function SignalCard({
           {!positionOpened && (
             <div className="flex items-center gap-1.5">
               <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
-              <span className={`text-xs font-medium ${c.timerText}`}>
+              <span className={`text-[13px] font-medium ${c.timerText}`}>
                 {marketInfo.timerSeconds !== null
                   ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
                   : marketInfo.timerLabel}
@@ -320,7 +320,7 @@ export default function SignalCard({
           <div>
             <h3 className={`text-[28px] leading-none font-black ${c.text}`}>{signal.asset}</h3>
             <div className="flex items-center gap-1.5 mt-1">
-              <span className={`text-xs font-medium ${c.textMut}`}>{signal.ticker}</span>
+              <span className={`text-[13px] font-medium ${c.textMut}`}>{signal.ticker}</span>
               <CopyButton value={signal.ticker} />
             </div>
           </div>
@@ -369,18 +369,18 @@ export default function SignalCard({
           {/* Timing */}
           <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${c.border}`}>
             <div>
-              <p className={`text-[11px] ${c.textMut} uppercase`}>Bester Einstieg</p>
+              <p className={`text-[13px] ${c.textMut} uppercase`}>Bester Einstieg</p>
               <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.optimalEntry}</p>
             </div>
             <div>
-              <p className={`text-[11px] ${c.textMut} uppercase`}>Markt schließt</p>
+              <p className={`text-[13px] ${c.textMut} uppercase`}>Markt schließt</p>
               <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.marketCloseTime}</p>
             </div>
           </div>
 
           {/* Reasoning */}
           <div className={`pt-4 border-t ${c.border}`}>
-            <p className={`text-[11px] ${c.textMut} uppercase mb-2`}>Begründung</p>
+            <p className={`text-[13px] ${c.textMut} uppercase mb-2`}>Begründung</p>
             <p className={`text-sm ${c.textSec} leading-relaxed`}>{signal.reasoning}</p>
           </div>
 
@@ -483,18 +483,18 @@ export default function SignalCard({
                       <div className="flex items-center gap-2">
                         <span className="text-green-500 text-base">✓</span>
                         <span className={`text-sm font-bold ${c.text}`}>Trade bestätigt</span>
-                        <span className={`text-xs ${c.textMut} ml-auto`}>
+                        <span className={`text-[13px] ${c.textMut} ml-auto`}>
                           Konfidenz: {revalidation.confidence}%
                         </span>
                       </div>
-                      <p className={`text-xs ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
+                      <p className={`text-[13px] ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
 
                       {/* Aktualisierte Werte */}
                       <div className="grid grid-cols-3 gap-3">
                         <div>
                           <CopyableValue label="Entry" value={String(revalidation.entry)} displayValue={revalidation.entry.toLocaleString("de-DE")} />
                           {revalidation.entry !== signal.entry && (
-                            <p className="text-[10px] text-white/40 line-through">
+                            <p className="text-[13px] text-white/55 line-through">
                               {signal.entry.toLocaleString("de-DE")}
                             </p>
                           )}
@@ -526,7 +526,7 @@ export default function SignalCard({
                         <span className="text-red-500 text-base">✕</span>
                         <span className={`text-sm font-bold ${c.text}`}>Trade nicht mehr empfohlen</span>
                       </div>
-                      <p className={`text-xs ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
+                      <p className={`text-[13px] ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
                       <button
                         onClick={handleCancelRevalidation}
                         className={`w-full rounded-[6px] py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
@@ -539,7 +539,7 @@ export default function SignalCard({
               ) : revalError ? (
                 /* ── Fehler ── */
                 <div className={`pt-4 border-t ${c.border} space-y-2`}>
-                  <p className={`text-xs ${c.textSec}`}>{revalError}</p>
+                  <p className={`text-[13px] ${c.textSec}`}>{revalError}</p>
                   <div className="flex gap-2">
                     <button
                       onClick={handleRevalidate}
