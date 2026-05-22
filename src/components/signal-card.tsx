@@ -560,9 +560,16 @@ export default function SignalCard({
                 <div className={`pt-4 border-t ${c.border}`}>
                   <button
                     onClick={handleRevalidate}
-                    className={`w-full rounded-[6px] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                    disabled={!marketInfo.isOpen}
+                    className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${
+                      marketInfo.isOpen
+                        ? `${c.btnBg} ${c.btnText} ${c.btnHover}`
+                        : "bg-white/10 text-white/30 cursor-not-allowed"
+                    }`}
                   >
-                    Position eröffnen · {allocatedBudget}€
+                    {marketInfo.isOpen
+                      ? `Position eröffnen · ${allocatedBudget}€`
+                      : "Markt geschlossen"}
                   </button>
                 </div>
               )}
