@@ -95,6 +95,10 @@ export default function Dashboard() {
               portfolio={portfolio}
               onUpdate={loadPortfolio}
               onCreateNew={() => setShowCreatePortfolio(true)}
+              onDeleted={async () => {
+                const p = await getActivePortfolio();
+                setPortfolio(p);
+              }}
             />
           ) : (
             <button

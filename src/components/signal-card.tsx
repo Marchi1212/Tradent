@@ -179,26 +179,26 @@ export default function SignalCard({
         onClick={() => setExpanded(!expanded)}
         className="w-full px-5 py-5 text-left"
       >
-        {/* Timer */}
-        <div className="flex items-center gap-1.5 mb-4">
-          <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
-          <span className={`text-xs font-medium ${c.timerText}`}>
-            {marketInfo.timerSeconds !== null
-              ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
-              : marketInfo.timerLabel}
-          </span>
+        {/* Top Row: Direction/Category/Leverage links, Timer rechts */}
+        <div className="flex items-center justify-between mb-3">
+          <p className={`text-sm font-bold ${c.text}`}>
+            {signal.direction} · {signal.category} · {signal.leverage}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
+            <span className={`text-xs font-medium ${c.timerText}`}>
+              {marketInfo.timerSeconds !== null
+                ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
+                : marketInfo.timerLabel}
+            </span>
+          </div>
         </div>
 
         {/* Asset + Confidence */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h3 className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.asset}</h3>
-            <p className={`text-sm font-bold ${c.text} mt-0.5`}>
-              {signal.direction} · {signal.category} · {signal.leverage}
-            </p>
-          </div>
+        <div className="flex items-end justify-between">
+          <h3 className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.asset}</h3>
           <div className="text-right">
-            <p className={`text-2xl font-black ${c.text}`}>{signal.confidence}%</p>
+            <p className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.confidence}%</p>
             <p className={`text-[11px] ${c.textMut}`}>Konfidenz</p>
           </div>
         </div>

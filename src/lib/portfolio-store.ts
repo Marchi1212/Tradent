@@ -241,6 +241,16 @@ export async function getTrades(portfolioId: string): Promise<Trade[]> {
   return (data || []).map(toTrade);
 }
 
+export async function deletePortfolio(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("portfolios")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
 export async function addTrade(trade: {
   portfolioId: string;
   signalId: string;

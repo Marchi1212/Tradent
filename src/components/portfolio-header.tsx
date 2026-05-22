@@ -3,17 +3,20 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Portfolio } from "@/lib/portfolio-store";
-import { getPortfolios, setActivePortfolio } from "@/lib/portfolio-store";
+import { getPortfolios, setActivePortfolio, deletePortfolio } from "@/lib/portfolio-store";
 
 interface Props {
   portfolio: Portfolio;
   onUpdate: () => void;
   onCreateNew: () => void;
+  onDeleted: () => void;
 }
 
-export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Props) {
+export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew, onDeleted }: Props) {
   const [open, setOpen] = useState(false);
   const [allPortfolios, setAllPortfolios] = useState<Portfolio[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, right: 0 });
@@ -66,6 +69,24 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
     }
   }
 
+  async function handleDelete() {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    try {
+      setDeleting(true);
+      await deletePortfolio(portfolio.id);
+      setConfirmDelete(false);
+      onDeleted();
+    } catch (err) {
+      console.error("Portfolio löschen fehlgeschlagen:", err);
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const otherPortfolios = allPortfolios.filter((p) => p.id !== portfolio.id);
 
   return (
@@ -86,6 +107,35 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
           <path d="M12 15.4L6 9.4L7.4 8L12 12.575L16.6 8L18 9.4L12 15.4Z" />
         </svg>
       </button>
+
+      {/* Delete Button */}
+      {confirmDelete ? (
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-sm font-bold text-red-500 transition-colors hover:text-red-600"
+          >
+            {deleting ? "…" : "Löschen?"}
+          </button>
+          <button
+            onClick={() => setConfirmDelete(false)}
+            className="text-sm text-text-muted transition-colors hover:text-text-primary"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={handleDelete}
+          className="text-text-muted transition-colors hover:text-red-500"
+          title="Portfolio löschen"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+          </svg>
+        </button>
+      )}
 
       {/* Dropdown via Portal – rendert direkt in <body>, kein Stacking-Context-Problem */}
       {open && typeof document !== "undefined" && createPortal(
