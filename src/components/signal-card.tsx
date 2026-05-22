@@ -273,11 +273,14 @@ export default function SignalCard({
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-5 py-5 text-left"
+        className="w-full px-5 py-4 text-left"
       >
-        {/* Timer oben rechts – nur wenn keine Position aktiv */}
-        {!positionOpened && (
-          <div className="flex justify-end mb-3">
+        {/* Zeile 1: Direction/Category/Leverage + Timer */}
+        <div className="flex items-center justify-between mb-1">
+          <p className={`text-sm font-bold ${c.text}`}>
+            {signal.direction} · {signal.category} · {signal.leverage}
+          </p>
+          {!positionOpened && (
             <div className="flex items-center gap-1.5">
               <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
               <span className={`text-xs font-medium ${c.timerText}`}>
@@ -286,25 +289,17 @@ export default function SignalCard({
                   : marketInfo.timerLabel}
               </span>
             </div>
-          </div>
-        )}
-
-        {/* Direction / Category / Leverage – direkt über Asset */}
-        <p className={`text-sm font-bold ${c.text} mb-1`}>
-          {signal.direction} · {signal.category} · {signal.leverage}
-        </p>
-
-        {/* Asset + Confidence */}
-        <div className="flex items-end justify-between">
-          <h3 className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.asset}</h3>
-          <div className="text-right">
-            <p className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.confidence}%</p>
-            <p className={`text-[11px] ${c.textMut}`}>Konfidenz</p>
-          </div>
+          )}
         </div>
 
-        {/* Expected Gain */}
-        <div className="flex items-center justify-between mt-5">
+        {/* Zeile 2: Asset + Confidence auf gleicher Baseline */}
+        <div className="flex items-baseline justify-between">
+          <h3 className={`text-[28px] leading-none font-black ${c.text}`}>{signal.asset}</h3>
+          <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
+        </div>
+
+        {/* Zeile 3: Expected Gain + Chevron */}
+        <div className="flex items-center justify-between mt-3">
           <div className={`${c.gainBg} rounded-[6px] px-3 py-1.5`}>
             <p className={`text-sm ${c.text}`}>
               <span className="font-bold">+{signal.expectedGainPercent}%</span>
