@@ -15,6 +15,43 @@ function ClockIcon({ className }: { className?: string }) {
   );
 }
 
+function CopyButton({ value, className }: { value: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <button onClick={handleCopy} className={`inline-flex items-center shrink-0 ${className || ""}`}>
+      {copied ? (
+        <svg className="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+      ) : (
+        <svg className="w-3.5 h-3.5 text-white/30 hover:text-white/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+function CopyableValue({ label, value, displayValue }: { label: string; value: string; displayValue?: string }) {
+  return (
+    <div>
+      <p className="text-[11px] text-white/40 uppercase">{label}</p>
+      <div className="flex items-center gap-1.5 mt-1">
+        <p className="text-base font-bold text-white">{displayValue || value}</p>
+        <CopyButton value={value} />
+      </div>
+    </div>
+  );
+}
+
 export default function SignalCard({
   signal,
   portfolio,
@@ -280,7 +317,13 @@ export default function SignalCard({
 
         {/* Zeile 2: Asset + Confidence auf gleicher Baseline */}
         <div className="flex items-baseline justify-between">
-          <h3 className={`text-[28px] leading-none font-black ${c.text}`}>{signal.asset}</h3>
+          <div>
+            <h3 className={`text-[28px] leading-none font-black ${c.text}`}>{signal.asset}</h3>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className={`text-xs font-medium ${c.textMut}`}>{signal.ticker}</span>
+              <CopyButton value={signal.ticker} />
+            </div>
+          </div>
           <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
         </div>
 
@@ -318,24 +361,9 @@ export default function SignalCard({
         <div className={`px-5 pb-5 space-y-4 border-t ${c.border} pt-4`}>
           {/* Entry / SL / TP */}
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <p className={`text-[11px] ${c.textMut} uppercase`}>Einstieg</p>
-              <p className={`text-base font-bold ${c.text} mt-1`}>
-                {signal.entry.toLocaleString("de-DE")}
-              </p>
-            </div>
-            <div>
-              <p className={`text-[11px] ${c.textMut} uppercase`}>Stop-Loss</p>
-              <p className={`text-base font-bold ${c.text} mt-1`}>
-                {signal.stopLoss.toLocaleString("de-DE")}
-              </p>
-            </div>
-            <div>
-              <p className={`text-[11px] ${c.textMut} uppercase`}>Take-Profit</p>
-              <p className={`text-base font-bold ${c.text} mt-1`}>
-                {signal.takeProfit.toLocaleString("de-DE")}
-              </p>
-            </div>
+            <CopyableValue label="Einstieg" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
+            <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
+            <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
           </div>
 
           {/* Timing */}
@@ -405,18 +433,8 @@ export default function SignalCard({
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className={`text-[11px] ${c.textMut} uppercase`}>Entry</p>
-                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
-                            {openTrade?.entry.toLocaleString("de-DE")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className={`text-[11px] ${c.textMut} uppercase`}>Exit (aktuell)</p>
-                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
-                            {closeResult.exitPrice.toLocaleString("de-DE")}
-                          </p>
-                        </div>
+                        <CopyableValue label="Entry" value={String(openTrade?.entry || "")} displayValue={openTrade?.entry.toLocaleString("de-DE")} />
+                        <CopyableValue label="Exit (aktuell)" value={String(closeResult.exitPrice)} displayValue={closeResult.exitPrice.toLocaleString("de-DE")} />
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -474,28 +492,15 @@ export default function SignalCard({
                       {/* Aktualisierte Werte */}
                       <div className="grid grid-cols-3 gap-3">
                         <div>
-                          <p className={`text-[11px] ${c.textMut} uppercase`}>Entry</p>
-                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
-                            {revalidation.entry.toLocaleString("de-DE")}
-                          </p>
+                          <CopyableValue label="Entry" value={String(revalidation.entry)} displayValue={revalidation.entry.toLocaleString("de-DE")} />
                           {revalidation.entry !== signal.entry && (
-                            <p className={`text-[10px] ${c.textMut} line-through`}>
+                            <p className="text-[10px] text-white/40 line-through">
                               {signal.entry.toLocaleString("de-DE")}
                             </p>
                           )}
                         </div>
-                        <div>
-                          <p className={`text-[11px] ${c.textMut} uppercase`}>Stop-Loss</p>
-                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
-                            {revalidation.stopLoss.toLocaleString("de-DE")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className={`text-[11px] ${c.textMut} uppercase`}>Take-Profit</p>
-                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
-                            {revalidation.takeProfit.toLocaleString("de-DE")}
-                          </p>
-                        </div>
+                        <CopyableValue label="Stop-Loss" value={String(revalidation.stopLoss)} displayValue={revalidation.stopLoss.toLocaleString("de-DE")} />
+                        <CopyableValue label="Take-Profit" value={String(revalidation.takeProfit)} displayValue={revalidation.takeProfit.toLocaleString("de-DE")} />
                       </div>
 
                       {/* Bestätigen / Abbrechen */}
