@@ -7,6 +7,7 @@ import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
 import PortfolioHeader from "./portfolio-header";
+import MobileMenu from "./mobile-menu";
 import SignOutButton from "@/app/sign-out-button";
 import { isWeekend, isGermanHoliday } from "@/lib/market-hours";
 
@@ -87,8 +88,10 @@ export default function Dashboard() {
     <>
       {/* Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
-        <img src="/logo.svg" alt="Tradent" className="h-5" />
-        <div className="flex items-center gap-3">
+        <img src="/logo.svg" alt="Tradent" className="h-5 shrink-0" />
+
+        {/* Desktop (≥768px) */}
+        <div className="hidden md:flex items-center gap-3">
           {portfolio ? (
             <PortfolioHeader
               portfolio={portfolio}
@@ -108,6 +111,22 @@ export default function Dashboard() {
             </button>
           )}
           <SignOutButton />
+        </div>
+
+        {/* Mobile (<768px) */}
+        <div className="flex md:hidden items-center gap-3">
+          {portfolio && (
+            <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
+          )}
+          <MobileMenu
+            portfolio={portfolio}
+            onUpdate={loadPortfolio}
+            onCreateNew={() => setShowCreatePortfolio(true)}
+            onDeleted={async () => {
+              const p = await getActivePortfolio();
+              setPortfolio(p);
+            }}
+          />
         </div>
       </header>
 
