@@ -42,7 +42,7 @@ export default function Dashboard() {
     <>
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
-        <span className="text-base font-bold text-text-primary">Tradent</span>
+        <img src="/logo.svg" alt="Tradent" className="h-5" />
         <div className="flex items-center gap-3">
           {portfolio ? (
             <PortfolioHeader

@@ -36,11 +36,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-bg-primary px-6">
       <div className="w-full max-w-sm space-y-10">
         {/* Brand */}
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold text-text-primary">
-            Tradent
-          </h1>
-          <p className="text-sm text-text-secondary mt-2">
+        <div className="flex flex-col items-center">
+          <img src="/logo.svg" alt="Tradent" className="h-6" />
+          <p className="text-sm text-text-secondary mt-3">
             Dein täglicher Trading-Advisor
           </p>
         </div>
