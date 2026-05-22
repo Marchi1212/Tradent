@@ -73,7 +73,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            Signale
+            Signals
           </button>
           <button
             onClick={() => setActiveTab("trades")}
@@ -83,7 +83,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            History
+            Journal
           </button>
         </div>
       </div>
