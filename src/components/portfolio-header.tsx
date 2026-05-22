@@ -48,23 +48,19 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Trigger */}
+      {/* Trigger – Feld-Style */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5"
+        className="flex items-center gap-2.5 bg-bg-secondary rounded-[6px] px-3 py-1.5"
       >
-        <div className="text-right">
-          <p className="text-sm font-bold text-text-primary">
-            {portfolio.currentBalance.toFixed(0)}€
-          </p>
-          <p className="text-[11px] text-text-muted">{portfolio.name}</p>
-        </div>
+        <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
+        <span className="text-xs text-text-muted">{portfolio.name}</span>
         <svg
-          className={`w-3.5 h-3.5 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3 h-3 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
-          strokeWidth={2}
+          strokeWidth={2.5}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
