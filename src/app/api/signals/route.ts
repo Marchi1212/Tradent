@@ -1,36 +1,65 @@
 import { NextResponse } from "next/server";
-import { getTodaySignalsServer, saveTodaySignals, todaySignalsExist } from "@/lib/signal-store";
+import { getSessionSignals, saveSessionSignals, sessionSignalsExist } from "@/lib/signal-store";
 import { generateSignals } from "@/lib/signal-generator";
+import { getRelevantSession, getCurrentSessionStatus } from "@/lib/sessions";
 
-export const maxDuration = 60; // Vercel: max 60s für Signalgenerierung
+export const maxDuration = 60;
 
 export async function GET() {
   try {
-    // 1. Prüfen ob heute schon Signale existieren
-    const existing = await getTodaySignalsServer();
+    // 1. Welche Session ist gerade relevant?
+    const sessionStatus = getCurrentSessionStatus();
+    const sessionId = getRelevantSession();
+
+    // Keine Session aktiv (vor 8:30)
+    if (!sessionId) {
+      return NextResponse.json({
+        status: sessionStatus.type,
+        session: sessionStatus.type === "upcoming" ? sessionStatus.session : null,
+        minutesUntil: sessionStatus.type === "upcoming" ? sessionStatus.minutesUntil : null,
+        signals: null,
+      });
+    }
+
+    // 2. Prüfen ob Signale für diese Session schon existieren
+    const existing = await getSessionSignals(sessionId);
     if (existing) {
-      return NextResponse.json(existing);
+      return NextResponse.json({
+        status: sessionStatus.type,
+        session: sessionStatus.type !== "closed" ? sessionStatus.session : null,
+        minutesLeft: sessionStatus.type === "active" ? sessionStatus.minutesLeft : null,
+        minutesUntil: sessionStatus.type === "upcoming" ? sessionStatus.minutesUntil : null,
+        signals: existing,
+      });
     }
 
-    // 2. Noch keine Signale → generieren
-    console.log("Keine Signale für heute gefunden. Generiere...");
+    // 3. Noch keine Signale → generieren
+    console.log(`Keine Signale für Session ${sessionId}. Generiere...`);
 
-    // Double-Check um Race Conditions zu vermeiden
-    const exists = await todaySignalsExist();
+    // Double-Check gegen Race Conditions
+    const exists = await sessionSignalsExist(sessionId);
     if (exists) {
-      const signals = await getTodaySignalsServer();
-      return NextResponse.json(signals);
+      const signals = await getSessionSignals(sessionId);
+      return NextResponse.json({
+        status: sessionStatus.type,
+        session: sessionStatus.type !== "closed" ? sessionStatus.session : null,
+        signals,
+      });
     }
 
-    // 3. Claude API aufrufen + Marktdaten laden
-    const generated = await generateSignals();
+    // 4. Claude API + Marktdaten
+    const generated = await generateSignals(sessionId);
 
-    // 4. In Supabase speichern
-    await saveTodaySignals(generated);
+    // 5. Speichern
+    await saveSessionSignals(sessionId, generated);
 
-    // 5. Gespeicherte Signale zurückgeben (mit IDs)
-    const saved = await getTodaySignalsServer();
-    return NextResponse.json(saved);
+    // 6. Gespeicherte Signale zurückgeben
+    const saved = await getSessionSignals(sessionId);
+    return NextResponse.json({
+      status: sessionStatus.type,
+      session: sessionStatus.type !== "closed" ? sessionStatus.session : null,
+      signals: saved,
+    });
   } catch (err) {
     console.error("Signal-Generierung fehlgeschlagen:", err);
     return NextResponse.json(

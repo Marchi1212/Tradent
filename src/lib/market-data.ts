@@ -1,73 +1,76 @@
 // Watchlist: alle Assets die Claude täglich analysiert
 // Breites Spektrum für maximale Performance
 
+import type { SessionId } from "./sessions";
+
 export interface WatchlistAsset {
   symbol: string;   // Yahoo Finance Symbol
   name: string;     // Anzeigename
   ticker: string;   // XTB Ticker
   category: string; // Index, Aktie, Forex, Rohstoff
   market: string;   // Handelsplatz
+  sessions: SessionId[]; // In welchen Runden analysiert
 }
 
 export const WATCHLIST: WatchlistAsset[] = [
   // ── Indizes (8) ──
-  { symbol: "^GDAXI", name: "DAX 40", ticker: "DE40", category: "Index", market: "XETRA" },
-  { symbol: "^GSPC", name: "S&P 500", ticker: "US500", category: "Index", market: "NYSE" },
-  { symbol: "^NDX", name: "NASDAQ 100", ticker: "US100", category: "Index", market: "NYSE" },
-  { symbol: "^DJI", name: "Dow Jones", ticker: "US30", category: "Index", market: "NYSE" },
-  { symbol: "^FTSE", name: "FTSE 100", ticker: "UK100", category: "Index", market: "LSE" },
-  { symbol: "^FCHI", name: "CAC 40", ticker: "FRA40", category: "Index", market: "XETRA" },
-  { symbol: "^STOXX50E", name: "Euro Stoxx 50", ticker: "EU50", category: "Index", market: "XETRA" },
-  { symbol: "^N225", name: "Nikkei 225", ticker: "JAP225", category: "Index", market: "JPX" },
+  { symbol: "^GDAXI", name: "DAX 40", ticker: "DE40", category: "Index", market: "XETRA", sessions: ["eu"] },
+  { symbol: "^FTSE", name: "FTSE 100", ticker: "UK100", category: "Index", market: "LSE", sessions: ["eu"] },
+  { symbol: "^FCHI", name: "CAC 40", ticker: "FRA40", category: "Index", market: "XETRA", sessions: ["eu"] },
+  { symbol: "^STOXX50E", name: "Euro Stoxx 50", ticker: "EU50", category: "Index", market: "XETRA", sessions: ["eu"] },
+  { symbol: "^N225", name: "Nikkei 225", ticker: "JAP225", category: "Index", market: "JPX", sessions: ["eu"] },
+  { symbol: "^GSPC", name: "S&P 500", ticker: "US500", category: "Index", market: "NYSE", sessions: ["us"] },
+  { symbol: "^NDX", name: "NASDAQ 100", ticker: "US100", category: "Index", market: "NYSE", sessions: ["us"] },
+  { symbol: "^DJI", name: "Dow Jones", ticker: "US30", category: "Index", market: "NYSE", sessions: ["us"] },
 
-  // ── US-Aktien (15) ──
-  { symbol: "TSLA", name: "Tesla", ticker: "TSLA.US", category: "Aktie", market: "NYSE" },
-  { symbol: "NVDA", name: "Nvidia", ticker: "NVDA.US", category: "Aktie", market: "NYSE" },
-  { symbol: "AAPL", name: "Apple", ticker: "AAPL.US", category: "Aktie", market: "NYSE" },
-  { symbol: "MSFT", name: "Microsoft", ticker: "MSFT.US", category: "Aktie", market: "NYSE" },
-  { symbol: "AMZN", name: "Amazon", ticker: "AMZN.US", category: "Aktie", market: "NYSE" },
-  { symbol: "META", name: "Meta", ticker: "META.US", category: "Aktie", market: "NYSE" },
-  { symbol: "GOOGL", name: "Alphabet", ticker: "GOOGL.US", category: "Aktie", market: "NYSE" },
-  { symbol: "AMD", name: "AMD", ticker: "AMD.US", category: "Aktie", market: "NYSE" },
-  { symbol: "NFLX", name: "Netflix", ticker: "NFLX.US", category: "Aktie", market: "NYSE" },
-  { symbol: "INTC", name: "Intel", ticker: "INTC.US", category: "Aktie", market: "NYSE" },
-  { symbol: "BA", name: "Boeing", ticker: "BA.US", category: "Aktie", market: "NYSE" },
-  { symbol: "JPM", name: "JPMorgan", ticker: "JPM.US", category: "Aktie", market: "NYSE" },
-  { symbol: "GS", name: "Goldman Sachs", ticker: "GS.US", category: "Aktie", market: "NYSE" },
-  { symbol: "DIS", name: "Disney", ticker: "DIS.US", category: "Aktie", market: "NYSE" },
-  { symbol: "KO", name: "Coca-Cola", ticker: "KO.US", category: "Aktie", market: "NYSE" },
+  // ── EU-Aktien (6) – nur EU-Runde ──
+  { symbol: "SAP.DE", name: "SAP", ticker: "SAP.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
+  { symbol: "SIE.DE", name: "Siemens", ticker: "SIE.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
+  { symbol: "ASML.AS", name: "ASML", ticker: "ASML.NL", category: "Aktie", market: "XETRA", sessions: ["eu"] },
+  { symbol: "MC.PA", name: "LVMH", ticker: "LVMH.FR", category: "Aktie", market: "XETRA", sessions: ["eu"] },
+  { symbol: "VOW3.DE", name: "Volkswagen", ticker: "VOW.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
+  { symbol: "DBK.DE", name: "Deutsche Bank", ticker: "DBK.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
 
-  // ── EU-Aktien (6) ──
-  { symbol: "SAP.DE", name: "SAP", ticker: "SAP.DE", category: "Aktie", market: "XETRA" },
-  { symbol: "SIE.DE", name: "Siemens", ticker: "SIE.DE", category: "Aktie", market: "XETRA" },
-  { symbol: "ASML.AS", name: "ASML", ticker: "ASML.NL", category: "Aktie", market: "XETRA" },
-  { symbol: "MC.PA", name: "LVMH", ticker: "LVMH.FR", category: "Aktie", market: "XETRA" },
-  { symbol: "VOW3.DE", name: "Volkswagen", ticker: "VOW.DE", category: "Aktie", market: "XETRA" },
-  { symbol: "DBK.DE", name: "Deutsche Bank", ticker: "DBK.DE", category: "Aktie", market: "XETRA" },
+  // ── US-Aktien (15) – nur US-Runde ──
+  { symbol: "TSLA", name: "Tesla", ticker: "TSLA.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "NVDA", name: "Nvidia", ticker: "NVDA.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "AAPL", name: "Apple", ticker: "AAPL.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "MSFT", name: "Microsoft", ticker: "MSFT.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "AMZN", name: "Amazon", ticker: "AMZN.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "META", name: "Meta", ticker: "META.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "GOOGL", name: "Alphabet", ticker: "GOOGL.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "AMD", name: "AMD", ticker: "AMD.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "NFLX", name: "Netflix", ticker: "NFLX.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "INTC", name: "Intel", ticker: "INTC.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "BA", name: "Boeing", ticker: "BA.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "JPM", name: "JPMorgan", ticker: "JPM.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "GS", name: "Goldman Sachs", ticker: "GS.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "DIS", name: "Disney", ticker: "DIS.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  { symbol: "KO", name: "Coca-Cola", ticker: "KO.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
 
-  // ── Forex (8) ──
-  { symbol: "EURUSD=X", name: "EUR/USD", ticker: "EURUSD", category: "Forex", market: "Forex" },
-  { symbol: "GBPUSD=X", name: "GBP/USD", ticker: "GBPUSD", category: "Forex", market: "Forex" },
-  { symbol: "USDJPY=X", name: "USD/JPY", ticker: "USDJPY", category: "Forex", market: "Forex" },
-  { symbol: "USDCHF=X", name: "USD/CHF", ticker: "USDCHF", category: "Forex", market: "Forex" },
-  { symbol: "EURGBP=X", name: "EUR/GBP", ticker: "EURGBP", category: "Forex", market: "Forex" },
-  { symbol: "AUDUSD=X", name: "AUD/USD", ticker: "AUDUSD", category: "Forex", market: "Forex" },
-  { symbol: "USDCAD=X", name: "USD/CAD", ticker: "USDCAD", category: "Forex", market: "Forex" },
-  { symbol: "NZDUSD=X", name: "NZD/USD", ticker: "NZDUSD", category: "Forex", market: "Forex" },
+  // ── Forex (8) – beide Runden ──
+  { symbol: "EURUSD=X", name: "EUR/USD", ticker: "EURUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "GBPUSD=X", name: "GBP/USD", ticker: "GBPUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "USDJPY=X", name: "USD/JPY", ticker: "USDJPY", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "USDCHF=X", name: "USD/CHF", ticker: "USDCHF", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "EURGBP=X", name: "EUR/GBP", ticker: "EURGBP", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "AUDUSD=X", name: "AUD/USD", ticker: "AUDUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "USDCAD=X", name: "USD/CAD", ticker: "USDCAD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "NZDUSD=X", name: "NZD/USD", ticker: "NZDUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
 
-  // ── Rohstoffe (6) ──
-  { symbol: "GC=F", name: "Gold", ticker: "GOLD", category: "Rohstoff", market: "COMEX" },
-  { symbol: "SI=F", name: "Silber", ticker: "SILVER", category: "Rohstoff", market: "COMEX" },
-  { symbol: "PL=F", name: "Platin", ticker: "PLATINUM", category: "Rohstoff", market: "COMEX" },
-  { symbol: "CL=F", name: "Öl (WTI)", ticker: "OIL.WTI", category: "Rohstoff", market: "NYMEX" },
-  { symbol: "BZ=F", name: "Öl (Brent)", ticker: "OIL", category: "Rohstoff", market: "NYMEX" },
-  { symbol: "NG=F", name: "Erdgas", ticker: "NATGAS", category: "Rohstoff", market: "NYMEX" },
+  // ── Rohstoffe (6) – beide Runden ──
+  { symbol: "GC=F", name: "Gold", ticker: "GOLD", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
+  { symbol: "SI=F", name: "Silber", ticker: "SILVER", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
+  { symbol: "PL=F", name: "Platin", ticker: "PLATINUM", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
+  { symbol: "CL=F", name: "Öl (WTI)", ticker: "OIL.WTI", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
+  { symbol: "BZ=F", name: "Öl (Brent)", ticker: "OIL", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
+  { symbol: "NG=F", name: "Erdgas", ticker: "NATGAS", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
 
-  // ── Krypto (4) ──
-  { symbol: "BTC-USD", name: "Bitcoin", ticker: "BITCOIN", category: "Krypto", market: "Krypto" },
-  { symbol: "ETH-USD", name: "Ethereum", ticker: "ETHEREUM", category: "Krypto", market: "Krypto" },
-  { symbol: "SOL-USD", name: "Solana", ticker: "SOLANA", category: "Krypto", market: "Krypto" },
-  { symbol: "XRP-USD", name: "Ripple", ticker: "RIPPLE", category: "Krypto", market: "Krypto" },
+  // ── Krypto (4) – beide Runden ──
+  { symbol: "BTC-USD", name: "Bitcoin", ticker: "BITCOIN", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "ETH-USD", name: "Ethereum", ticker: "ETHEREUM", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "SOL-USD", name: "Solana", ticker: "SOLANA", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "XRP-USD", name: "Ripple", ticker: "RIPPLE", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
 ];
 
 export interface AssetMarketData {
@@ -166,13 +169,14 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
   }
 }
 
-// Alle Assets parallel laden (in Batches von 8)
-export async function fetchAllMarketData(): Promise<AssetMarketData[]> {
+// Assets für eine Session parallel laden (in Batches von 8)
+export async function fetchMarketDataForSession(session: SessionId): Promise<AssetMarketData[]> {
+  const filtered = WATCHLIST.filter((a) => a.sessions.includes(session));
   const results: AssetMarketData[] = [];
   const batchSize = 8;
 
-  for (let i = 0; i < WATCHLIST.length; i += batchSize) {
-    const batch = WATCHLIST.slice(i, i + batchSize);
+  for (let i = 0; i < filtered.length; i += batchSize) {
+    const batch = filtered.slice(i, i + batchSize);
     const settled = await Promise.allSettled(batch.map(fetchSingleAsset));
 
     for (const result of settled) {

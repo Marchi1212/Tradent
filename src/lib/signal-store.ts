@@ -1,14 +1,9 @@
 import type { Signal } from "./mock-signals";
+import type { SessionId } from "./sessions";
 
 // Server-seitiger Supabase Client für API-Routes
 async function getServerClient() {
   const { createClient } = await import("@/lib/supabase/server");
-  return createClient();
-}
-
-// Client-seitiger Supabase Client für Frontend
-async function getBrowserClient() {
-  const { createClient } = await import("@/lib/supabase/client");
   return createClient();
 }
 
@@ -28,25 +23,25 @@ function toSignal(row: Record<string, unknown>): Signal {
     riskRewardRatio: row.risk_reward_ratio as string,
     reasoning: row.reasoning as string,
     market: row.market as string,
-    marketStatus: "open", // wird dynamisch berechnet
+    marketStatus: "open",
     marketCloseTime: row.market_close_time as string,
     optimalEntry: row.optimal_entry as string,
     category: row.category as string,
   };
 }
 
-// Heutige Signale aus Supabase laden (client-seitig)
-export async function getTodaySignals(): Promise<{
-  steady: Signal;
-  bold: Signal;
-} | null> {
-  const supabase = getBrowserClient();
+// Signale für eine Session laden (server-seitig)
+export async function getSessionSignals(
+  session: SessionId
+): Promise<{ steady: Signal; bold: Signal } | null> {
+  const supabase = await getServerClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const { data, error } = await (await supabase)
+  const { data, error } = await supabase
     .from("signals")
     .select("*")
-    .eq("date", today);
+    .eq("date", today)
+    .eq("session", session);
 
   if (error) throw error;
   if (!data || data.length < 2) return null;
@@ -59,8 +54,24 @@ export async function getTodaySignals(): Promise<{
   return { steady, bold };
 }
 
-// Signale in Supabase speichern (server-seitig, aus API-Route)
-export async function saveTodaySignals(
+// Prüfen ob Session-Signale existieren (server-seitig)
+export async function sessionSignalsExist(session: SessionId): Promise<boolean> {
+  const supabase = await getServerClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const { count, error } = await supabase
+    .from("signals")
+    .select("*", { count: "exact", head: true })
+    .eq("date", today)
+    .eq("session", session);
+
+  if (error) return false;
+  return (count ?? 0) >= 2;
+}
+
+// Signale für eine Session speichern (server-seitig)
+export async function saveSessionSignals(
+  session: SessionId,
   signals: {
     steady: {
       asset: string;
@@ -103,6 +114,7 @@ export async function saveTodaySignals(
 
   const rows = [signals.steady, signals.bold].map((s, i) => ({
     date: today,
+    session,
     risk_class: i === 0 ? "steady" : "bold",
     asset: s.asset,
     ticker: s.ticker,
@@ -122,44 +134,5 @@ export async function saveTodaySignals(
   }));
 
   const { error } = await supabase.from("signals").insert(rows);
-
   if (error) throw error;
-}
-
-// Prüfen ob heute schon Signale existieren (server-seitig)
-export async function todaySignalsExist(): Promise<boolean> {
-  const supabase = await getServerClient();
-  const today = new Date().toISOString().split("T")[0];
-
-  const { count, error } = await supabase
-    .from("signals")
-    .select("*", { count: "exact", head: true })
-    .eq("date", today);
-
-  if (error) return false;
-  return (count ?? 0) >= 2;
-}
-
-// Heutige Signale laden (server-seitig, für API-Route)
-export async function getTodaySignalsServer(): Promise<{
-  steady: Signal;
-  bold: Signal;
-} | null> {
-  const supabase = await getServerClient();
-  const today = new Date().toISOString().split("T")[0];
-
-  const { data, error } = await supabase
-    .from("signals")
-    .select("*")
-    .eq("date", today);
-
-  if (error) throw error;
-  if (!data || data.length < 2) return null;
-
-  const signals: Signal[] = data.map(toSignal);
-  const steady = signals.find((s: Signal) => s.riskClass === "steady");
-  const bold = signals.find((s: Signal) => s.riskClass === "bold");
-
-  if (!steady || !bold) return null;
-  return { steady, bold };
 }

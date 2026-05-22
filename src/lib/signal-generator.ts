@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { fetchAllMarketData, type AssetMarketData } from "./market-data";
+import { fetchMarketDataForSession, type AssetMarketData } from "./market-data";
+import { SESSIONS, type SessionId } from "./sessions";
 
 export interface GeneratedSignal {
   asset: string;
@@ -31,7 +32,9 @@ function formatMarketDataForPrompt(data: AssetMarketData[]): string {
     .join("\n\n");
 }
 
-const SYSTEM_PROMPT = `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten und identifizierst die 2 besten Trading-Setups des Tages.
+function buildSystemPrompt(session: SessionId): string {
+  const s = SESSIONS[session];
+  return `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten und identifizierst die 2 besten Trading-Setups für die ${s.label} (Handelsfenster ${s.tradingWindow}).
 
 Deine Analyse basiert auf:
 - Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
@@ -44,24 +47,29 @@ Du gibst immer 2 Signale aus:
 
 Regeln:
 - Alle Trades sind CFD-Daytrading auf XTB
+- Trades werden INNERHALB des Handelsfensters ${s.tradingWindow} eröffnet und VOR Handelsschluss geschlossen
 - Risk-Reward-Ratio mindestens 1:1.5
 - Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Stop-Loss muss eng genug sein für Daytrading
+- Stop-Loss muss eng genug sein für Daytrading (Intraday-Levels)
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
+- optimalEntry = konkretes Zeitfenster innerhalb von ${s.tradingWindow}
 - Begründung auf Deutsch, 2-3 Sätze
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
+}
 
-function buildUserPrompt(marketData: string, date: string): string {
+function buildUserPrompt(marketData: string, date: string, session: SessionId): string {
+  const s = SESSIONS[session];
   return `Datum: ${date}
+Session: ${s.label} (${s.tradingWindow})
 
 Marktdaten:
 
 ${marketData}
 
-Analysiere alle Assets und wähle die 2 besten Setups. Antworte NUR mit diesem JSON:
+Analysiere alle Assets und wähle die 2 besten Setups für das Handelsfenster ${s.tradingWindow}. Antworte NUR mit diesem JSON:
 
 {
   "steady": {
@@ -78,7 +86,7 @@ Analysiere alle Assets und wähle die 2 besten Setups. Antworte NUR mit diesem J
     "reasoning": "Begründung auf Deutsch...",
     "market": "XETRA",
     "marketCloseTime": "17:30",
-    "optimalEntry": "09:00–11:00",
+    "optimalEntry": "09:00–10:00",
     "category": "Index"
   },
   "bold": {
@@ -95,27 +103,29 @@ Analysiere alle Assets und wähle die 2 besten Setups. Antworte NUR mit diesem J
     "reasoning": "Begründung auf Deutsch...",
     "market": "NYSE",
     "marketCloseTime": "22:00",
-    "optimalEntry": "15:30–17:00",
+    "optimalEntry": "15:30–16:30",
     "category": "Aktie"
   }
 }`;
 }
 
-export async function generateSignals(): Promise<{
+export async function generateSignals(session: SessionId): Promise<{
   steady: GeneratedSignal;
   bold: GeneratedSignal;
 }> {
-  // 1. Marktdaten laden
-  console.log("Lade Marktdaten...");
-  const marketData = await fetchAllMarketData();
+  const s = SESSIONS[session];
+
+  // 1. Marktdaten für diese Session laden
+  console.log(`[${s.label}] Lade Marktdaten...`);
+  const marketData = await fetchMarketDataForSession(session);
 
   if (marketData.length < 3) {
     throw new Error(
-      `Zu wenig Marktdaten geladen (${marketData.length} Assets). Mindestens 3 benötigt.`
+      `Zu wenig Marktdaten für ${s.label} (${marketData.length} Assets). Mindestens 3 benötigt.`
     );
   }
 
-  console.log(`${marketData.length} Assets geladen. Rufe Claude API auf...`);
+  console.log(`[${s.label}] ${marketData.length} Assets geladen. Rufe Claude API auf...`);
 
   // 2. Claude API aufrufen
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -132,11 +142,11 @@ export async function generateSignals(): Promise<{
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1500,
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(session),
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today),
+        content: buildUserPrompt(formattedData, today, session),
       },
     ],
   });
@@ -149,7 +159,6 @@ export async function generateSignals(): Promise<{
 
   let parsed: { steady: GeneratedSignal; bold: GeneratedSignal };
   try {
-    // JSON aus der Antwort extrahieren (falls drumherum Text ist)
     const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Kein JSON in der Antwort gefunden");
     parsed = JSON.parse(jsonMatch[0]);
@@ -163,12 +172,11 @@ export async function generateSignals(): Promise<{
     throw new Error("Antwort enthält nicht beide Signale (steady + bold)");
   }
 
-  // Risk-Class setzen
   parsed.steady.riskClass = "steady";
   parsed.bold.riskClass = "bold";
 
   console.log(
-    `Signale generiert: ${parsed.steady.asset} (Steady) + ${parsed.bold.asset} (Bold)`
+    `[${s.label}] Signale generiert: ${parsed.steady.asset} (Steady) + ${parsed.bold.asset} (Bold)`
   );
 
   return parsed;
