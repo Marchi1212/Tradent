@@ -213,34 +213,20 @@ export default function SignalCard({
     }
   }
 
-  // Farb-Schema: Steady = hell, Bold = invertiert
-  const c = isBold
-    ? {
-        bg: "bg-[#1A1A1A]",
-        text: "text-white",
-        textSec: "text-white/60",
-        textMut: "text-white/40",
-        border: "border-white/10",
-        btnBg: "bg-white",
-        btnText: "text-[#1A1A1A]",
-        btnHover: "hover:bg-white/90",
-        btnOutline: "border border-white/20 text-white hover:border-white/40",
-        timerText: "text-white/50",
-        gainBg: "bg-[#2A2A2A]",
-      }
-    : {
-        bg: "bg-bg-card",
-        text: "text-text-primary",
-        textSec: "text-text-secondary",
-        textMut: "text-text-muted",
-        border: "border-border",
-        btnBg: "bg-accent",
-        btnText: "text-white",
-        btnHover: "hover:bg-accent-hover",
-        btnOutline: "border border-border text-text-primary hover:border-border-hover",
-        timerText: "text-text-muted",
-        gainBg: "bg-white",
-      };
+  // Einheitliches dunkles Farb-Schema für beide Karten
+  const c = {
+    bg: "bg-[#1A1A1A]",
+    text: "text-white",
+    textSec: "text-white/60",
+    textMut: "text-white/40",
+    border: "border-white/10",
+    btnBg: "bg-white",
+    btnText: "text-[#1A1A1A]",
+    btnHover: "hover:bg-white/90",
+    btnOutline: "border border-white/20 text-white hover:border-white/40",
+    timerText: "text-white/50",
+    gainBg: "bg-[#2A2A2A]",
+  };
 
   return (
     <div className={`rounded-[12px] ${c.bg} overflow-hidden`}>
@@ -253,14 +239,14 @@ export default function SignalCard({
               schließt in {formatTimer(marketInfo.closeSeconds)}
             </span>
           </div>
-          <div className={`w-full h-1.5 rounded-full ${isBold ? "bg-white/10" : "bg-border"}`}>
+          <div className="w-full h-1.5 rounded-full bg-white/10">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
                 marketInfo.closeSeconds < 3600
                   ? "bg-red-500"
                   : marketInfo.closeSeconds < 7200
                     ? "bg-amber-500"
-                    : isBold ? "bg-white" : "bg-text-primary"
+                    : "bg-white"
               }`}
               style={{
                 width: `${Math.max(2, (marketInfo.closeSeconds / marketInfo.totalTradingSeconds) * 100)}%`,
