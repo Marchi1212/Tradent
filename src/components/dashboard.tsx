@@ -53,7 +53,7 @@ export default function Dashboard() {
           ) : (
             <button
               onClick={() => setShowCreatePortfolio(true)}
-              className="rounded-[--radius-md] bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+              className="rounded-[--radius-btn] bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
             >
               Portfolio eröffnen
             </button>
@@ -63,13 +63,13 @@ export default function Dashboard() {
       </header>
 
       {/* Tab Bar */}
-      <div className="sticky top-[61px] z-10 bg-bg-primary border-b border-border">
-        <div className="flex max-w-lg mx-auto">
+      <div className="sticky top-[61px] z-10 bg-bg-primary px-5 pt-4 pb-2">
+        <div className="flex max-w-lg mx-auto rounded-[--radius-md] bg-bg-secondary p-1 gap-1">
           <button
             onClick={() => setActiveTab("signals")}
-            className={`flex-1 py-3 text-sm font-semibold text-center transition-colors ${
+            className={`flex-1 rounded-[--radius-btn] py-2 text-sm font-semibold text-center transition-colors ${
               activeTab === "signals"
-                ? "text-text-primary border-b-2 border-text-primary"
+                ? "bg-bg-primary text-text-primary shadow-sm"
                 : "text-text-muted"
             }`}
           >
@@ -77,9 +77,9 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setActiveTab("trades")}
-            className={`flex-1 py-3 text-sm font-semibold text-center transition-colors ${
+            className={`flex-1 rounded-[--radius-btn] py-2 text-sm font-semibold text-center transition-colors ${
               activeTab === "trades"
-                ? "text-text-primary border-b-2 border-text-primary"
+                ? "bg-bg-primary text-text-primary shadow-sm"
                 : "text-text-muted"
             }`}
           >
@@ -88,7 +88,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <main className="flex-1 px-5 py-8 w-full max-w-lg mx-auto space-y-6">
+      <main className="flex-1 px-5 py-6 w-full max-w-lg mx-auto space-y-6">
         {activeTab === "signals" ? (
           <>
             <p className="text-sm text-text-muted">{today}</p>

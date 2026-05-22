@@ -72,6 +72,7 @@ export default function SignalCard({
     }
   }
 
+  // Farb-Schema: Steady = hell, Bold = invertiert
   const c = isBold
     ? {
         bg: "bg-[#1A1A1A]",
@@ -83,9 +84,7 @@ export default function SignalCard({
         btnText: "text-[#1A1A1A]",
         btnHover: "hover:bg-white/90",
         btnOutline: "border border-white/20 text-white hover:border-white/40",
-        pos: "text-[#34D399]",
-        neg: "text-[#F87171]",
-        timerText: marketInfo.canStillEnter ? "text-[#34D399]" : "text-white/50",
+        timerText: "text-white/50",
         badge: "bg-white/10 text-white/70",
       }
     : {
@@ -98,21 +97,19 @@ export default function SignalCard({
         btnText: "text-white",
         btnHover: "hover:bg-accent-hover",
         btnOutline: "border border-border text-text-primary hover:border-border-hover",
-        pos: "text-positive",
-        neg: "text-negative",
-        timerText: marketInfo.canStillEnter ? "text-positive" : "text-text-muted",
+        timerText: "text-text-muted",
         badge: "bg-bg-elevated text-text-muted",
       };
 
   return (
-    <div className={`rounded-[--radius-lg] ${c.bg} overflow-hidden`}>
+    <div className={`rounded-[--radius-md] ${c.bg} overflow-hidden`}>
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-5 py-5 text-left"
       >
         {/* Timer */}
-        <div className="flex items-center gap-1.5 mb-3">
+        <div className="flex items-center gap-1.5 mb-4">
           <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
           <span className={`text-xs font-medium ${c.timerText}`}>
             {marketInfo.timerSeconds !== null
@@ -123,28 +120,28 @@ export default function SignalCard({
 
         {/* Asset + Confidence */}
         <div className="flex items-start justify-between">
-          <h3 className={`text-2xl font-black ${c.text}`}>{signal.asset}</h3>
+          <div>
+            <h3 className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.asset}</h3>
+            <p className={`text-xs ${c.textMut} mt-0.5`}>
+              {signal.direction} · {signal.category} · {signal.leverage}
+            </p>
+          </div>
           <div className="text-right">
             <p className={`text-2xl font-black ${c.text}`}>{signal.confidence}%</p>
             <p className={`text-[11px] ${c.textMut}`}>Konfidenz</p>
           </div>
         </div>
 
-        {/* Meta */}
-        <p className={`text-sm ${c.textSec} mt-1`}>
-          {signal.direction} · {signal.category} · {signal.leverage}
-        </p>
-
         {/* Expected Gain */}
         <div className="flex items-center justify-between mt-5">
           <p className={`text-sm ${c.textSec}`}>
-            <span className={`font-bold ${c.pos}`}>+{signal.expectedGainPercent}%</span>
+            <span className={`font-bold ${c.text}`}>+{signal.expectedGainPercent}%</span>
             {hasPortfolio && (
               <>
                 <span className={c.textMut}> · </span>
-                <span className={`font-bold ${c.text}`}>{recommendedBudget.toFixed(0)}€</span>
+                <span className={c.textMut}>{recommendedBudget.toFixed(0)}€ Einsatz</span>
                 <span className={c.textMut}> → </span>
-                <span className={`font-bold ${c.pos}`}>+{expectedGainEuro}€</span>
+                <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
               </>
             )}
           </p>
@@ -173,13 +170,13 @@ export default function SignalCard({
             </div>
             <div>
               <p className={`text-[11px] ${c.textMut} uppercase`}>Stop-Loss</p>
-              <p className={`text-base font-bold ${c.neg} mt-1`}>
+              <p className={`text-base font-bold ${c.text} mt-1`}>
                 {signal.stopLoss.toLocaleString("de-DE")}
               </p>
             </div>
             <div>
               <p className={`text-[11px] ${c.textMut} uppercase`}>Take-Profit</p>
-              <p className={`text-base font-bold ${c.pos} mt-1`}>
+              <p className={`text-base font-bold ${c.text} mt-1`}>
                 {signal.takeProfit.toLocaleString("de-DE")}
               </p>
             </div>
@@ -211,11 +208,11 @@ export default function SignalCard({
             </div>
             <div className="flex justify-between text-sm">
               <span className={c.textSec}>Max. Verlust ({riskPercent}%)</span>
-              <span className={`font-bold ${c.neg}`}>-{maxLoss.toFixed(2)}€</span>
+              <span className={`font-bold ${c.text}`}>-{maxLoss.toFixed(2)}€</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className={c.textSec}>Erwarteter Gewinn</span>
-              <span className={`font-bold ${c.pos}`}>+{expectedGainEuro}€</span>
+              <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
             </div>
           </div>
 
@@ -226,7 +223,7 @@ export default function SignalCard({
                 <div className={`pt-4 border-t ${c.border}`}>
                   <button
                     onClick={handleOpenPosition}
-                    className={`w-full rounded-[--radius-md] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                    className={`w-full rounded-[--radius-btn] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
                   >
                     Position eröffnen · {recommendedBudget.toFixed(0)}€
                   </button>
@@ -238,7 +235,7 @@ export default function SignalCard({
                     <span className={`text-sm ${c.textSec}`}>{recommendedBudget.toFixed(0)}€</span>
                   </div>
                   <button
-                    className={`w-full rounded-[--radius-md] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
+                    className={`w-full rounded-[--radius-btn] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
                   >
                     Position schließen
                   </button>

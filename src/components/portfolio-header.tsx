@@ -137,7 +137,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              className="w-full rounded-[--radius-btn] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
               {saving ? "Speichert..." : "Speichern"}
             </button>
@@ -153,7 +153,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
                       <button
                         key={p.id}
                         onClick={() => handleSwitch(p.id)}
-                        className="w-full flex items-center justify-between rounded-[--radius-sm] px-3 py-2.5 text-sm hover:bg-bg-secondary transition-colors"
+                        className="w-full flex items-center justify-between rounded-[--radius-btn] px-3 py-2.5 text-sm hover:bg-bg-secondary transition-colors"
                       >
                         <span className="text-text-primary font-medium">{p.name}</span>
                         <span className="text-text-muted">{p.currentBalance.toFixed(0)}€</span>
@@ -166,7 +166,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
             {/* Neues Portfolio */}
             <button
               onClick={() => { setShowSettings(false); onCreateNew(); }}
-              className="w-full rounded-[--radius-md] border border-border py-3 text-sm font-semibold text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
+              className="w-full rounded-[--radius-btn] border border-border py-3 text-sm font-semibold text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
             >
               Neues Portfolio eröffnen
             </button>

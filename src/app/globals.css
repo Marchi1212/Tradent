@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Light, clean palette – Trade Republic inspired */
+  /* Light, clean palette */
   --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F6F6F6;
-  --color-bg-card: #F6F6F6;
+  --color-bg-secondary: #F7F7F7;
+  --color-bg-card: #F7F7F7;
   --color-bg-elevated: #EFEFEF;
 
   --color-text-primary: #1A1A1A;
@@ -14,9 +14,9 @@
   --color-accent: #1A1A1A;
   --color-accent-hover: #333333;
 
-  --color-positive: #0CBB6F;
-  --color-negative: #E23636;
-  --color-warning: #F5A623;
+  --color-positive: #1A1A1A;
+  --color-negative: #1A1A1A;
+  --color-warning: #9B9B9B;
 
   --color-border: #E8E8E8;
   --color-border-hover: #D0D0D0;
@@ -25,10 +25,10 @@
   --font-sans: var(--font-hanken);
 
   /* Border radius */
-  --radius-sm: 8px;
+  --radius-btn: 6px;
   --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
 body {

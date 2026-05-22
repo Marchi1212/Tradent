@@ -126,7 +126,7 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="w-full rounded-[--radius-btn] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? "Wird erstellt..." : "Portfolio eröffnen"}
           </button>
