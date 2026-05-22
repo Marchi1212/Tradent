@@ -165,16 +165,68 @@ export async function updatePortfolio(
   if (error) throw error;
 }
 
+// Kelly Criterion: optimale Positionsgroeße fuer maximale Portfolio-Performance
+// Half Kelly (fraction=0.5) als Standard: 75% des Wachstums, deutlich weniger Risiko
+const KELLY_FRACTION = 0.5;
+
+interface SignalInput {
+  confidence: number;       // 0-100
+  riskRewardRatio: number;  // z.B. 2 fuer 1:2
+  stopLossPercent: number;  // SL-Abstand in %
+  leverage: number;
+}
+
+function kellyPercent(confidence: number, riskReward: number): number {
+  const p = confidence / 100;
+  const kelly = p - (1 - p) / riskReward;
+  return Math.max(0, kelly); // Nie negativ – kein Trade wenn Edge negativ
+}
+
+function rawPositionSize(balance: number, kellyPct: number, slPercent: number, leverage: number): number {
+  const maxLoss = balance * kellyPct * KELLY_FRACTION;
+  const effectiveRisk = slPercent * leverage;
+  return maxLoss / (effectiveRisk / 100);
+}
+
+// Berechnet optimale Aufteilung des Kapitals auf mehrere Signale
+export function allocateCapital(
+  balance: number,
+  signals: SignalInput[]
+): number[] {
+  if (signals.length === 0) return [];
+
+  // Kelly-Gewichtung pro Signal
+  const kellys = signals.map(s => kellyPercent(s.confidence, s.riskRewardRatio));
+
+  // Rohe Positionen berechnen
+  const rawPositions = signals.map((s, i) =>
+    kellys[i] > 0
+      ? rawPositionSize(balance, kellys[i], s.stopLossPercent, s.leverage)
+      : 0
+  );
+
+  // Wenn Gesamtsumme > Balance: proportional skalieren
+  const total = rawPositions.reduce((a, b) => a + b, 0);
+  if (total > balance) {
+    const scale = balance / total;
+    return rawPositions.map(p => Math.floor(p * scale));
+  }
+
+  return rawPositions.map(p => Math.floor(p));
+}
+
+// Einzelne Position (Fallback fuer einzelne Berechnung)
 export function calculatePositionSize(
   balance: number,
-  riskPercent: number,
+  confidence: number,
+  riskRewardRatio: number,
   stopLossPercent: number,
   leverage: number
 ): number {
-  const maxLoss = balance * (riskPercent / 100);
-  const effectiveRisk = stopLossPercent * leverage;
-  const positionSize = maxLoss / (effectiveRisk / 100);
-  return Math.min(positionSize, balance);
+  const kelly = kellyPercent(confidence, riskRewardRatio);
+  if (kelly <= 0) return 0;
+  const size = rawPositionSize(balance, kelly, stopLossPercent, leverage);
+  return Math.min(Math.floor(size), balance);
 }
 
 export async function getTrades(portfolioId: string): Promise<Trade[]> {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { todaySignals } from "@/lib/mock-signals";
-import { getActivePortfolio, type Portfolio } from "@/lib/portfolio-store";
+import { getActivePortfolio, allocateCapital, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
@@ -10,6 +10,22 @@ import PortfolioHeader from "./portfolio-header";
 import SignOutButton from "@/app/sign-out-button";
 
 type Tab = "signals" | "trades";
+
+function parseSignalInputs(signals: typeof todaySignals) {
+  return [signals.steady, signals.bold].map((s) => {
+    const slPercent =
+      s.direction === "LONG"
+        ? ((s.entry - s.stopLoss) / s.entry) * 100
+        : ((s.stopLoss - s.entry) / s.entry) * 100;
+    const rr = parseFloat(s.riskRewardRatio.split(":")[1]);
+    return {
+      confidence: s.confidence,
+      riskRewardRatio: rr,
+      stopLossPercent: slPercent,
+      leverage: parseFloat(s.leverage),
+    };
+  });
+}
 
 export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -31,6 +47,12 @@ export default function Dashboard() {
   }, []);
 
   if (!loaded) return null;
+
+  // Kelly-basierte Kapitalaufteilung
+  const signalInputs = parseSignalInputs(todaySignals);
+  const allocations = portfolio
+    ? allocateCapital(portfolio.currentBalance, signalInputs)
+    : [0, 0];
 
   const today = new Date().toLocaleDateString("de-DE", {
     weekday: "long",
@@ -93,8 +115,8 @@ export default function Dashboard() {
           <>
             <p className="text-sm text-text-muted">{today}</p>
             <div className="space-y-4">
-              <SignalCard signal={todaySignals.steady} portfolio={portfolio} />
-              <SignalCard signal={todaySignals.bold} portfolio={portfolio} />
+              <SignalCard signal={todaySignals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} />
+              <SignalCard signal={todaySignals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} />
             </div>
           </>
         ) : portfolio ? (

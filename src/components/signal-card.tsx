@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
 import type { Portfolio } from "@/lib/portfolio-store";
-import { calculatePositionSize } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 
 function ClockIcon({ className }: { className?: string }) {
@@ -18,9 +17,11 @@ function ClockIcon({ className }: { className?: string }) {
 export default function SignalCard({
   signal,
   portfolio,
+  allocatedBudget,
 }: {
   signal: Signal;
   portfolio: Portfolio | null;
+  allocatedBudget: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [positionOpened, setPositionOpened] = useState(false);
@@ -34,24 +35,32 @@ export default function SignalCard({
   }, [signal.market]);
 
   const isBold = signal.riskClass === "bold";
-  const hasPortfolio = portfolio !== null;
+  const hasPortfolio = portfolio !== null && allocatedBudget > 0;
 
-  // Position sizing nur mit Portfolio
-  const riskPercent = hasPortfolio ? (isBold ? portfolio.riskBold : portfolio.riskSteady) : 0;
+  // Berechnungen basierend auf Kelly-Allokation vom Dashboard
+  const leverage = parseFloat(signal.leverage);
   const slPercent =
     signal.direction === "LONG"
       ? ((signal.entry - signal.stopLoss) / signal.entry) * 100
       : ((signal.stopLoss - signal.entry) / signal.entry) * 100;
-  const leverage = parseFloat(signal.leverage);
+  const tpPercent =
+    signal.direction === "LONG"
+      ? ((signal.takeProfit - signal.entry) / signal.entry) * 100
+      : ((signal.entry - signal.takeProfit) / signal.entry) * 100;
 
-  const recommendedBudget = hasPortfolio
-    ? calculatePositionSize(portfolio.currentBalance, riskPercent, slPercent, leverage)
-    : 0;
-  const maxLoss = hasPortfolio ? portfolio.currentBalance * (riskPercent / 100) : 0;
-  const expectedGainEuro = (recommendedBudget * signal.expectedGainPercent / 100).toFixed(2);
+  const expectedGainEuro = hasPortfolio
+    ? (allocatedBudget * leverage * tpPercent / 100).toFixed(2)
+    : "0";
+  const maxLossEuro = hasPortfolio
+    ? (allocatedBudget * leverage * slPercent / 100).toFixed(2)
+    : "0";
+
+  // Beispielrechnung ohne Portfolio (200€ Beispiel)
+  const exampleBudget = 200;
+  const exampleGain = (exampleBudget * leverage * tpPercent / 100).toFixed(0);
 
   async function handleOpenPosition() {
-    if (!portfolio) return;
+    if (!portfolio || allocatedBudget <= 0) return;
     try {
       const { addTrade } = await import("@/lib/portfolio-store");
       await addTrade({
@@ -63,7 +72,7 @@ export default function SignalCard({
         stopLoss: signal.stopLoss,
         takeProfit: signal.takeProfit,
         leverage: signal.leverage,
-        budget: recommendedBudget,
+        budget: allocatedBudget,
         status: "open",
       });
       setPositionOpened(true);
@@ -85,7 +94,6 @@ export default function SignalCard({
         btnHover: "hover:bg-white/90",
         btnOutline: "border border-white/20 text-white hover:border-white/40",
         timerText: "text-white/50",
-        badge: "bg-white/10 text-white/70",
       }
     : {
         bg: "bg-bg-card",
@@ -98,7 +106,6 @@ export default function SignalCard({
         btnHover: "hover:bg-accent-hover",
         btnOutline: "border border-border text-text-primary hover:border-border-hover",
         timerText: "text-text-muted",
-        badge: "bg-bg-elevated text-text-muted",
       };
 
   return (
@@ -140,12 +147,12 @@ export default function SignalCard({
             {hasPortfolio ? (
               <>
                 <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
-                <span className={c.textMut}> bei {recommendedBudget.toFixed(0)}€</span>
+                <span className={c.textMut}> bei {allocatedBudget}€</span>
               </>
             ) : (
               <>
-                <span className={`font-bold ${c.text}`}>+{(200 * signal.expectedGainPercent / 100).toFixed(0)}€</span>
-                <span className={c.textMut}> bei 200€</span>
+                <span className={`font-bold ${c.text}`}>+{exampleGain}€</span>
+                <span className={c.textMut}> bei {exampleBudget}€</span>
               </>
             )}
           </p>
@@ -204,21 +211,23 @@ export default function SignalCard({
             <p className={`text-sm ${c.textSec} leading-relaxed`}>{signal.reasoning}</p>
           </div>
 
-          {/* Risk + Budget Info */}
-          <div className={`pt-4 border-t ${c.border} space-y-1`}>
-            <div className="flex justify-between text-sm">
-              <span className={c.textSec}>Empfohlener Einsatz</span>
-              <span className={`font-bold ${c.text}`}>{recommendedBudget.toFixed(0)}€</span>
+          {/* Risk + Budget Info – nur mit Portfolio */}
+          {hasPortfolio && (
+            <div className={`pt-4 border-t ${c.border} space-y-1`}>
+              <div className="flex justify-between text-sm">
+                <span className={c.textSec}>Einsatz (Kelly)</span>
+                <span className={`font-bold ${c.text}`}>{allocatedBudget}€</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className={c.textSec}>Max. Verlust</span>
+                <span className={`font-bold ${c.text}`}>-{maxLossEuro}€</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className={c.textSec}>Erwarteter Gewinn</span>
+                <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className={c.textSec}>Max. Verlust ({riskPercent}%)</span>
-              <span className={`font-bold ${c.text}`}>-{maxLoss.toFixed(2)}€</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className={c.textSec}>Erwarteter Gewinn</span>
-              <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
-            </div>
-          </div>
+          )}
 
           {/* Position eröffnen – nur mit Portfolio */}
           {hasPortfolio && (
@@ -229,14 +238,14 @@ export default function SignalCard({
                     onClick={handleOpenPosition}
                     className={`w-full rounded-[6px] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
                   >
-                    Position eröffnen · {recommendedBudget.toFixed(0)}€
+                    Position eröffnen · {allocatedBudget}€
                   </button>
                 </div>
               ) : (
                 <div className={`pt-4 border-t ${c.border} space-y-3`}>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
-                    <span className={`text-sm ${c.textSec}`}>{recommendedBudget.toFixed(0)}€</span>
+                    <span className={`text-sm ${c.textSec}`}>{allocatedBudget}€</span>
                   </div>
                   <button
                     className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
