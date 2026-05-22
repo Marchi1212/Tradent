@@ -72,8 +72,6 @@ export default function Dashboard() {
     Promise.all([loadPortfolio(), loadSignals()]).then(() => setLoaded(true));
   }, []);
 
-  if (!loaded) return null;
-
   const allocations = portfolio && signals
     ? allocateCapital(portfolio.currentBalance, parseSignalInputs(signals))
     : [0, 0];
@@ -112,8 +110,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Tab Bar */}
-      <div className="sticky top-[61px] z-20 bg-bg-primary px-5 pt-4 pb-2">
+      {/* Tab Bar – erst nach Laden zeigen */}
+      {loaded && <div className="sticky top-[61px] z-20 bg-bg-primary px-5 pt-4 pb-2">
         <div className="flex max-w-[200px] mx-auto rounded-[12px] bg-bg-secondary p-1 gap-1">
           <button
             onClick={() => setActiveTab("signals")}
@@ -136,10 +134,15 @@ export default function Dashboard() {
             Journal
           </button>
         </div>
-      </div>
+      </div>}
 
       <main className="flex-1 px-5 py-6 w-full max-w-lg mx-auto space-y-6">
-        {activeTab === "signals" ? (
+        {!loaded ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-8 h-8 border-2 border-text-muted border-t-text-primary rounded-full animate-spin mb-4" />
+            <p className="text-sm font-semibold text-text-primary">Wird geladen…</p>
+          </div>
+        ) : activeTab === "signals" ? (
           <>
             <p className="text-sm text-text-muted">{today}</p>
             {signalsLoading ? (
