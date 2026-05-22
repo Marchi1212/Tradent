@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import type { Portfolio } from "@/lib/portfolio-store";
 import { getPortfolios, setActivePortfolio } from "@/lib/portfolio-store";
 
@@ -13,25 +14,47 @@ interface Props {
 export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Props) {
   const [open, setOpen] = useState(false);
   const [allPortfolios, setAllPortfolios] = useState<Portfolio[]>([]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+
+  const updatePosition = useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (open) {
       getPortfolios().then(setAllPortfolios).catch(console.error);
+      updatePosition();
     }
-  }, [open]);
+  }, [open, updatePosition]);
 
   useEffect(() => {
+    if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     }
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+    function handleScroll() {
+      updatePosition();
     }
-  }, [open]);
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [open, updatePosition]);
 
   async function handleSwitch(id: string) {
     try {
@@ -46,9 +69,10 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
   const otherPortfolios = allPortfolios.filter((p) => p.id !== portfolio.id);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <>
       {/* Trigger */}
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-3 bg-bg-secondary rounded-[6px] px-3.5 py-2"
       >
@@ -63,9 +87,18 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
         </svg>
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 rounded-[12px] bg-bg-primary border border-border shadow-lg overflow-hidden z-50">
+      {/* Dropdown via Portal – rendert direkt in <body>, kein Stacking-Context-Problem */}
+      {open && typeof document !== "undefined" && createPortal(
+        <div
+          ref={dropdownRef}
+          className="w-56 rounded-[12px] bg-bg-primary border border-border shadow-lg overflow-hidden"
+          style={{
+            position: "fixed",
+            top: pos.top,
+            right: pos.right,
+            zIndex: 9999,
+          }}
+        >
           {/* Andere Portfolios */}
           {otherPortfolios.map((p) => (
             <button
@@ -90,8 +123,9 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
               Neues Depot
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }

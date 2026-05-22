@@ -63,7 +63,7 @@ export default function Dashboard() {
   return (
     <>
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
+      <header className="sticky top-0 z-30 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
         <img src="/logo.svg" alt="Tradent" className="h-5" />
         <div className="flex items-center gap-3">
           {portfolio ? (
@@ -85,7 +85,7 @@ export default function Dashboard() {
       </header>
 
       {/* Tab Bar */}
-      <div className="sticky top-[61px] z-10 bg-bg-primary px-5 pt-4 pb-2">
+      <div className="sticky top-[61px] z-20 bg-bg-primary px-5 pt-4 pb-2">
         <div className="flex max-w-[200px] mx-auto rounded-[12px] bg-bg-secondary p-1 gap-1">
           <button
             onClick={() => setActiveTab("signals")}
