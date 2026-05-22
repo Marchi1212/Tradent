@@ -2,7 +2,8 @@
 const MARKET_HOURS: Record<string, { open: number; close: number; label: string }> = {
   XETRA: { open: 9, close: 17.5, label: "XETRA" },       // 09:00 - 17:30
   NYSE: { open: 15.5, close: 22, label: "NYSE" },          // 15:30 - 22:00
-  LSE: { open: 9, close: 17.5, label: "LSE" },             // 09:00 - 17:30
+  LSE: { open: 9, close: 17.5, label: "LSE" },              // 09:00 - 17:30
+  JPX: { open: 2, close: 8, label: "JPX" },                 // 02:00 - 08:00 CET
   Forex: { open: 0, close: 24, label: "24/5" },            // 24h Mo-Fr
   COMEX: { open: 8.33, close: 20.5, label: "COMEX" },      // 08:20 - 20:30
   NYMEX: { open: 8.33, close: 20.5, label: "NYMEX" },      // 08:20 - 20:30
