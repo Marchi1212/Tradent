@@ -94,6 +94,7 @@ export default function SignalCard({
         btnHover: "hover:bg-white/90",
         btnOutline: "border border-white/20 text-white hover:border-white/40",
         timerText: "text-white/50",
+        gainBg: "bg-[#2A2A2A]",
       }
     : {
         bg: "bg-bg-card",
@@ -106,6 +107,7 @@ export default function SignalCard({
         btnHover: "hover:bg-accent-hover",
         btnOutline: "border border-border text-text-primary hover:border-border-hover",
         timerText: "text-text-muted",
+        gainBg: "bg-white",
       };
 
   return (
@@ -129,7 +131,7 @@ export default function SignalCard({
         <div className="flex items-start justify-between">
           <div>
             <h3 className={`text-[32px] leading-tight font-black ${c.text}`}>{signal.asset}</h3>
-            <p className={`text-xs ${c.textMut} mt-0.5`}>
+            <p className={`text-sm font-bold ${c.text} mt-0.5`}>
               {signal.direction} · {signal.category} · {signal.leverage}
             </p>
           </div>
@@ -141,21 +143,23 @@ export default function SignalCard({
 
         {/* Expected Gain */}
         <div className="flex items-center justify-between mt-5">
-          <p className={`text-sm ${c.textSec}`}>
-            <span className={`font-bold ${c.text}`}>+{signal.expectedGainPercent}%</span>
-            <span className={c.textMut}> · </span>
-            {hasPortfolio ? (
-              <>
-                <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
-                <span className={c.textMut}> bei {allocatedBudget}€</span>
-              </>
-            ) : (
-              <>
-                <span className={`font-bold ${c.text}`}>+{exampleGain}€</span>
-                <span className={c.textMut}> bei {exampleBudget}€</span>
-              </>
-            )}
-          </p>
+          <div className={`${c.gainBg} rounded-[6px] px-3 py-1.5`}>
+            <p className={`text-sm ${c.textSec}`}>
+              <span className={`font-bold ${c.text}`}>+{signal.expectedGainPercent}%</span>
+              <span className={c.textMut}> · </span>
+              {hasPortfolio ? (
+                <>
+                  <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
+                  <span className={c.textMut}> bei {allocatedBudget}€</span>
+                </>
+              ) : (
+                <>
+                  <span className={`font-bold ${c.text}`}>+{exampleGain}€</span>
+                  <span className={c.textMut}> bei {exampleBudget}€</span>
+                </>
+              )}
+            </p>
+          </div>
           <svg
             className={`w-5 h-5 ${c.textMut} transition-transform ${expanded ? "rotate-180" : ""}`}
             fill="none"
