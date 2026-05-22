@@ -58,7 +58,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
+              className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
               placeholder="name@email.de"
             />
           </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
+              className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-text-muted"
               placeholder="••••••••"
             />
           </div>
@@ -88,7 +88,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-[--radius-btn] bg-accent py-3.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="w-full rounded-[6px] bg-accent py-3.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             {loading ? "Anmelden..." : "Anmelden"}
           </button>

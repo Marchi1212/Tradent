@@ -102,7 +102,7 @@ export default function SignalCard({
       };
 
   return (
-    <div className={`rounded-[--radius-md] ${c.bg} overflow-hidden`}>
+    <div className={`rounded-[12px] ${c.bg} overflow-hidden`}>
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -227,7 +227,7 @@ export default function SignalCard({
                 <div className={`pt-4 border-t ${c.border}`}>
                   <button
                     onClick={handleOpenPosition}
-                    className={`w-full rounded-[--radius-btn] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                    className={`w-full rounded-[6px] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
                   >
                     Position eröffnen · {recommendedBudget.toFixed(0)}€
                   </button>
@@ -239,7 +239,7 @@ export default function SignalCard({
                     <span className={`text-sm ${c.textSec}`}>{recommendedBudget.toFixed(0)}€</span>
                   </div>
                   <button
-                    className={`w-full rounded-[--radius-btn] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
+                    className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
                   >
                     Position schließen
                   </button>

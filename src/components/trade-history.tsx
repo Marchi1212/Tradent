@@ -27,10 +27,10 @@ export default function TradeHistory({ portfolioId }: Props) {
   return (
     <div className="space-y-5">
       {/* Sub-Tabs */}
-      <div className="flex rounded-[--radius-md] bg-bg-secondary p-1 gap-1">
+      <div className="flex rounded-[12px] bg-bg-secondary p-1 gap-1">
         <button
           onClick={() => setSubTab("my-trades")}
-          className={`flex-1 rounded-[--radius-btn] py-2 text-xs font-semibold text-center transition-colors ${
+          className={`flex-1 rounded-[6px] py-2 text-xs font-semibold text-center transition-colors ${
             subTab === "my-trades"
               ? "bg-bg-primary text-text-primary shadow-sm"
               : "text-text-muted"
@@ -40,7 +40,7 @@ export default function TradeHistory({ portfolioId }: Props) {
         </button>
         <button
           onClick={() => setSubTab("all-signals")}
-          className={`flex-1 rounded-[--radius-btn] py-2 text-xs font-semibold text-center transition-colors ${
+          className={`flex-1 rounded-[6px] py-2 text-xs font-semibold text-center transition-colors ${
             subTab === "all-signals"
               ? "bg-bg-primary text-text-primary shadow-sm"
               : "text-text-muted"
@@ -84,7 +84,7 @@ function MyTrades({ trades }: { trades: Trade[] }) {
     <div className="space-y-5">
       {/* Zusammenfassung */}
       {closedTrades.length > 0 && (
-        <div className="rounded-[--radius-md] bg-bg-secondary p-4">
+        <div className="rounded-[12px] bg-bg-secondary p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] text-text-muted uppercase">Gesamt-Ergebnis</p>
@@ -173,7 +173,7 @@ function TradeRow({ trade }: { trade: Trade }) {
   });
 
   return (
-    <div className="rounded-[--radius-md] bg-bg-card px-4 py-3.5 flex items-center justify-between">
+    <div className="rounded-[12px] bg-bg-card px-4 py-3.5 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
           trade.direction === "LONG"

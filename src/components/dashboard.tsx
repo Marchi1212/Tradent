@@ -53,7 +53,7 @@ export default function Dashboard() {
           ) : (
             <button
               onClick={() => setShowCreatePortfolio(true)}
-              className="rounded-[--radius-btn] bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+              className="rounded-[6px] bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
             >
               Portfolio eröffnen
             </button>
@@ -64,10 +64,10 @@ export default function Dashboard() {
 
       {/* Tab Bar */}
       <div className="sticky top-[61px] z-10 bg-bg-primary px-5 pt-4 pb-2">
-        <div className="flex max-w-[200px] mx-auto rounded-[--radius-md] bg-bg-secondary p-1 gap-1">
+        <div className="flex max-w-[200px] mx-auto rounded-[12px] bg-bg-secondary p-1 gap-1">
           <button
             onClick={() => setActiveTab("signals")}
-            className={`flex-1 rounded-[--radius-btn] py-2 text-sm font-semibold text-center transition-colors ${
+            className={`flex-1 rounded-[6px] py-2 text-sm font-semibold text-center transition-colors ${
               activeTab === "signals"
                 ? "bg-bg-primary text-text-primary shadow-sm"
                 : "text-text-muted"
@@ -77,7 +77,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setActiveTab("trades")}
-            className={`flex-1 rounded-[--radius-btn] py-2 text-sm font-semibold text-center transition-colors ${
+            className={`flex-1 rounded-[6px] py-2 text-sm font-semibold text-center transition-colors ${
               activeTab === "trades"
                 ? "bg-bg-primary text-text-primary shadow-sm"
                 : "text-text-muted"

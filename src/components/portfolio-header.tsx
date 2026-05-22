@@ -73,7 +73,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/30" onClick={() => setShowSettings(false)} />
-          <div className="relative w-full max-w-sm bg-bg-primary rounded-t-[--radius-xl] sm:rounded-[--radius-xl] p-6 space-y-5 max-h-[85vh] overflow-y-auto">
+          <div className="relative w-full max-w-sm bg-bg-primary rounded-t-[16px] sm:rounded-[16px] p-6 space-y-5 max-h-[85vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-black text-text-primary">Portfolio</h3>
@@ -85,7 +85,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
             </div>
 
             {/* Balance */}
-            <div className="rounded-[--radius-md] bg-bg-secondary p-4">
+            <div className="rounded-[12px] bg-bg-secondary p-4">
               <p className="text-[11px] text-text-muted uppercase mb-1">Kontostand</p>
               <p className="text-2xl font-black text-text-primary">{portfolio.currentBalance.toFixed(0)}€</p>
               <p className="text-xs text-text-muted mt-1">
@@ -100,7 +100,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3 text-sm text-text-primary outline-none focus:border-text-muted"
+                className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3 text-sm text-text-primary outline-none focus:border-text-muted"
               />
             </div>
 
@@ -114,7 +114,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
                     value={riskSteady}
                     onChange={(e) => setRiskSteady(e.target.value)}
                     min="0.5" max="10" step="0.5"
-                    className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3 text-sm text-text-primary outline-none focus:border-text-muted pr-10"
+                    className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3 text-sm text-text-primary outline-none focus:border-text-muted pr-10"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-text-muted">%</span>
                 </div>
@@ -127,7 +127,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
                     value={riskBold}
                     onChange={(e) => setRiskBold(e.target.value)}
                     min="0.5" max="10" step="0.5"
-                    className="w-full rounded-[--radius-md] bg-bg-secondary border border-border px-4 py-3 text-sm text-text-primary outline-none focus:border-text-muted pr-10"
+                    className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3 text-sm text-text-primary outline-none focus:border-text-muted pr-10"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-text-muted">%</span>
                 </div>
@@ -137,7 +137,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full rounded-[--radius-btn] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              className="w-full rounded-[6px] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
               {saving ? "Speichert..." : "Speichern"}
             </button>
@@ -153,7 +153,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
                       <button
                         key={p.id}
                         onClick={() => handleSwitch(p.id)}
-                        className="w-full flex items-center justify-between rounded-[--radius-btn] px-3 py-2.5 text-sm hover:bg-bg-secondary transition-colors"
+                        className="w-full flex items-center justify-between rounded-[6px] px-3 py-2.5 text-sm hover:bg-bg-secondary transition-colors"
                       >
                         <span className="text-text-primary font-medium">{p.name}</span>
                         <span className="text-text-muted">{p.currentBalance.toFixed(0)}€</span>
@@ -166,7 +166,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
             {/* Neues Portfolio */}
             <button
               onClick={() => { setShowSettings(false); onCreateNew(); }}
-              className="w-full rounded-[--radius-btn] border border-border py-3 text-sm font-semibold text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
+              className="w-full rounded-[6px] border border-border py-3 text-sm font-semibold text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
             >
               Neues Portfolio eröffnen
             </button>
