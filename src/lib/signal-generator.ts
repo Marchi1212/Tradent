@@ -53,8 +53,8 @@ Regeln:
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes Zeitfenster (z.B. "09:00–10:00" für EU, "15:30–16:30" für US)
-- marketCloseTime = wann der Markt schließt und der Trade spätestens geschlossen werden muss
+- optimalEntry = konkretes Zeitfenster mit bester Liquidität (z.B. "09:00–10:00" für EU-Indizes, "15:30–16:30" für US)
+- marketCloseTime = XTB-Handelsschluss (z.B. "22:00" für EU-Index-CFDs, "23:00" für US-Index-CFDs, "17:30" für EU-Aktien, "22:00" für US-Aktien)
 - Begründung auf Deutsch, 2-3 Sätze
 - Entscheide rein nach Qualität des Setups – Performance first
 
@@ -108,8 +108,8 @@ Regeln:
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes Zeitfenster
-- marketCloseTime = wann der Trade spätestens geschlossen werden muss
+- optimalEntry = konkretes Zeitfenster mit bester Liquidität
+- marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
 - Begründung auf Deutsch, 2-3 Sätze
 - Performance first
 
@@ -126,18 +126,23 @@ function buildUserPrompt(marketData: string, date: string, dayType: TradingDayTy
     ? `Handelszeiten (deutsche Zeit):
 - Krypto: 24/7 – einziger handelbarer Markt am Wochenende`
     : dayType === "german_holiday"
-      ? `Handelszeiten (deutsche Zeit):
-- NYSE/US-Aktien: 15:30–22:00
+      ? `XTB CFD-Handelszeiten (deutsche Zeit / CET):
+- Index-CFDs (US500, US100, US30): 00:05–23:00
+- US-Aktien-CFDs: 15:30–22:00
 - Forex: 24h (Mo–Fr)
-- Rohstoffe (COMEX/NYMEX): 08:20–20:30
+- Rohstoffe: ~00:00–23:00
 - Krypto: 24/7
-- XETRA/EU-Aktien: GESCHLOSSEN (Feiertag)`
-      : `Handelszeiten (deutsche Zeit):
-- XETRA/EU-Aktien: 09:00–17:30
-- NYSE/US-Aktien: 15:30–22:00
-- Forex: 24h (Mo–Fr)
-- Rohstoffe (COMEX/NYMEX): 08:20–20:30
-- Krypto: 24/7`;
+- XETRA/EU-Aktien/EU-Indizes: GESCHLOSSEN (Feiertag)
+WICHTIG: marketCloseTime = XTB-Handelsschluss`
+      : `XTB CFD-Handelszeiten (deutsche Zeit / CET):
+- Index-CFDs (DE40, EU50, FRA40, UK100, JAP225): 01:15–22:00
+- Index-CFDs (US500, US100, US30): 00:05–23:00
+- EU-Aktien-CFDs (XETRA): 09:00–17:30
+- US-Aktien-CFDs (NYSE/NASDAQ): 15:30–22:00
+- Forex: 24h (Mo–Fr), So 23:00 – Fr 22:00
+- Rohstoffe (Gold, Silber, Öl etc.): ~00:00–23:00
+- Krypto: 24/7
+WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`;
 
   const instruction = dayType === "weekend"
     ? "Wähle die 2 absolut besten Krypto-Setups. Analysiere jedes Asset tiefgehend."

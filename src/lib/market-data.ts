@@ -23,30 +23,30 @@ export const WATCHLIST: WatchlistAsset[] = [
   { symbol: "^NDX", name: "NASDAQ 100", ticker: "US100", category: "Index", market: "NYSE", sessions: ["us"] },
   { symbol: "^DJI", name: "Dow Jones", ticker: "US30", category: "Index", market: "NYSE", sessions: ["us"] },
 
-  // ── EU-Aktien (6) – nur EU-Runde ──
-  { symbol: "SAP.DE", name: "SAP", ticker: "SAP.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
-  { symbol: "SIE.DE", name: "Siemens", ticker: "SIE.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
-  { symbol: "ASML.AS", name: "ASML", ticker: "ASML.NL", category: "Aktie", market: "XETRA", sessions: ["eu"] },
-  { symbol: "MC.PA", name: "LVMH", ticker: "LVMH.FR", category: "Aktie", market: "XETRA", sessions: ["eu"] },
-  { symbol: "VOW3.DE", name: "Volkswagen", ticker: "VOW.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
-  { symbol: "DBK.DE", name: "Deutsche Bank", ticker: "DBK.DE", category: "Aktie", market: "XETRA", sessions: ["eu"] },
+  // ── EU-Aktien (6) – XETRA Börsenzeiten ──
+  { symbol: "SAP.DE", name: "SAP", ticker: "SAP.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "SIE.DE", name: "Siemens", ticker: "SIE.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "ASML.AS", name: "ASML", ticker: "ASML.NL", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "MC.PA", name: "LVMH", ticker: "LVMH.FR", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "VOW3.DE", name: "Volkswagen", ticker: "VOW.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "DBK.DE", name: "Deutsche Bank", ticker: "DBK.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
 
-  // ── US-Aktien (15) – nur US-Runde ──
-  { symbol: "TSLA", name: "Tesla", ticker: "TSLA.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "NVDA", name: "Nvidia", ticker: "NVDA.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "AAPL", name: "Apple", ticker: "AAPL.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "MSFT", name: "Microsoft", ticker: "MSFT.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "AMZN", name: "Amazon", ticker: "AMZN.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "META", name: "Meta", ticker: "META.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "GOOGL", name: "Alphabet", ticker: "GOOGL.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "AMD", name: "AMD", ticker: "AMD.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "NFLX", name: "Netflix", ticker: "NFLX.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "INTC", name: "Intel", ticker: "INTC.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "BA", name: "Boeing", ticker: "BA.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "JPM", name: "JPMorgan", ticker: "JPM.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "GS", name: "Goldman Sachs", ticker: "GS.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "DIS", name: "Disney", ticker: "DIS.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
-  { symbol: "KO", name: "Coca-Cola", ticker: "KO.US", category: "Aktie", market: "NYSE", sessions: ["us"] },
+  // ── US-Aktien (15) – NYSE Börsenzeiten ──
+  { symbol: "TSLA", name: "Tesla", ticker: "TSLA.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "NVDA", name: "Nvidia", ticker: "NVDA.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "AAPL", name: "Apple", ticker: "AAPL.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "MSFT", name: "Microsoft", ticker: "MSFT.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "AMZN", name: "Amazon", ticker: "AMZN.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "META", name: "Meta", ticker: "META.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "GOOGL", name: "Alphabet", ticker: "GOOGL.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "AMD", name: "AMD", ticker: "AMD.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "NFLX", name: "Netflix", ticker: "NFLX.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "INTC", name: "Intel", ticker: "INTC.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "BA", name: "Boeing", ticker: "BA.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "JPM", name: "JPMorgan", ticker: "JPM.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "GS", name: "Goldman Sachs", ticker: "GS.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "DIS", name: "Disney", ticker: "DIS.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "KO", name: "Coca-Cola", ticker: "KO.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
 
   // ── Forex (8) – beide Runden ──
   { symbol: "EURUSD=X", name: "EUR/USD", ticker: "EURUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
@@ -185,7 +185,7 @@ export async function fetchCryptoMarketData(): Promise<AssetMarketData[]> {
 
 // Alle Assets OHNE XETRA laden (für deutsche Feiertage: US/Forex/Rohstoffe/Crypto offen)
 export async function fetchNonXetraMarketData(): Promise<AssetMarketData[]> {
-  const nonXetra = WATCHLIST.filter((a) => !["XETRA", "LSE", "JPX"].includes(a.market));
+  const nonXetra = WATCHLIST.filter((a) => !["XETRA", "XETRA_STOCK", "LSE", "JPX"].includes(a.market));
   return fetchAssetBatch(nonXetra);
 }
 

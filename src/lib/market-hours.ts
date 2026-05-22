@@ -1,12 +1,24 @@
-// Handelszeiten der Märkte (deutsche Zeit / CET)
+// XTB CFD-Handelszeiten (deutsche Zeit / CET)
+// Quelle: xtb.com Instrument Specifications
 const MARKET_HOURS: Record<string, { open: number; close: number; label: string }> = {
-  XETRA: { open: 9, close: 17.5, label: "XETRA" },       // 09:00 - 17:30
-  NYSE: { open: 15.5, close: 22, label: "NYSE" },          // 15:30 - 22:00
-  LSE: { open: 9, close: 17.5, label: "LSE" },              // 09:00 - 17:30
-  JPX: { open: 2, close: 8, label: "JPX" },                 // 02:00 - 08:00 CET
-  Forex: { open: 0, close: 24, label: "24/5" },            // 24h Mo-Fr
-  COMEX: { open: 8.33, close: 20.5, label: "COMEX" },      // 08:20 - 20:30
-  NYMEX: { open: 8.33, close: 20.5, label: "NYMEX" },      // 08:20 - 20:30
+  // Index-CFDs – fast 24h handelbar auf XTB
+  XETRA: { open: 1.25, close: 22, label: "XTB DE40" },     // 01:15 - 22:00
+  NYSE: { open: 0.08, close: 23, label: "XTB US-Index" },   // 00:05 - 23:00
+  LSE: { open: 1, close: 23, label: "XTB UK100" },          // 01:00 - 23:00
+  JPX: { open: 1.25, close: 22, label: "XTB JAP225" },      // 01:15 - 22:00
+
+  // Aktien-CFDs – reguläre Börsenzeiten
+  XETRA_STOCK: { open: 9, close: 17.5, label: "XETRA Aktien" },   // 09:00 - 17:30
+  NYSE_STOCK: { open: 15.5, close: 22, label: "NYSE Aktien" },     // 15:30 - 22:00
+
+  // Forex – 24/5
+  Forex: { open: 0, close: 23, label: "24/5" },             // So 23:00 - Fr 22:00
+
+  // Rohstoffe – ca. 23h/Tag auf XTB
+  COMEX: { open: 0, close: 23, label: "XTB Rohstoffe" },    // ~00:00 - 23:00
+  NYMEX: { open: 0, close: 23, label: "XTB Rohstoffe" },    // ~00:00 - 23:00
+
+  // Krypto – 24/7
   Krypto: { open: 0, close: 24, label: "24/7" },
 };
 
