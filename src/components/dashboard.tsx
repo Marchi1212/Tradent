@@ -4,13 +4,17 @@ import { useState, useEffect } from "react";
 import { todaySignals } from "@/lib/mock-signals";
 import { getActivePortfolio, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
+import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
 import PortfolioHeader from "./portfolio-header";
 import SignOutButton from "@/app/sign-out-button";
 
+type Tab = "signals" | "trades";
+
 export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("signals");
   const [loaded, setLoaded] = useState(false);
 
   async function loadPortfolio() {
@@ -58,13 +62,51 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="flex-1 px-5 py-8 w-full max-w-lg mx-auto space-y-6">
-        <p className="text-sm text-text-muted">{today}</p>
-
-        <div className="space-y-4">
-          <SignalCard signal={todaySignals.steady} portfolio={portfolio} />
-          <SignalCard signal={todaySignals.bold} portfolio={portfolio} />
+      {/* Tab Bar */}
+      <div className="sticky top-[61px] z-10 bg-bg-primary border-b border-border">
+        <div className="flex max-w-lg mx-auto">
+          <button
+            onClick={() => setActiveTab("signals")}
+            className={`flex-1 py-3 text-sm font-semibold text-center transition-colors ${
+              activeTab === "signals"
+                ? "text-text-primary border-b-2 border-text-primary"
+                : "text-text-muted"
+            }`}
+          >
+            Signale
+          </button>
+          <button
+            onClick={() => setActiveTab("trades")}
+            className={`flex-1 py-3 text-sm font-semibold text-center transition-colors ${
+              activeTab === "trades"
+                ? "text-text-primary border-b-2 border-text-primary"
+                : "text-text-muted"
+            }`}
+          >
+            Trades
+          </button>
         </div>
+      </div>
+
+      <main className="flex-1 px-5 py-8 w-full max-w-lg mx-auto space-y-6">
+        {activeTab === "signals" ? (
+          <>
+            <p className="text-sm text-text-muted">{today}</p>
+            <div className="space-y-4">
+              <SignalCard signal={todaySignals.steady} portfolio={portfolio} />
+              <SignalCard signal={todaySignals.bold} portfolio={portfolio} />
+            </div>
+          </>
+        ) : portfolio ? (
+          <TradeHistory portfolioId={portfolio.id} />
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-sm font-semibold text-text-primary">Kein Portfolio aktiv</p>
+            <p className="text-xs text-text-muted mt-1">
+              Eröffne ein Portfolio um Trades zu tracken.
+            </p>
+          </div>
+        )}
       </main>
 
       {/* Create Portfolio Modal */}
