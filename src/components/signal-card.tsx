@@ -50,8 +50,26 @@ export default function SignalCard({
   const maxLoss = hasPortfolio ? portfolio.currentBalance * (riskPercent / 100) : 0;
   const expectedGainEuro = (recommendedBudget * signal.expectedGainPercent / 100).toFixed(2);
 
-  function handleOpenPosition() {
-    setPositionOpened(true);
+  async function handleOpenPosition() {
+    if (!portfolio) return;
+    try {
+      const { addTrade } = await import("@/lib/portfolio-store");
+      await addTrade({
+        portfolioId: portfolio.id,
+        signalId: signal.id,
+        asset: signal.asset,
+        direction: signal.direction,
+        entry: signal.entry,
+        stopLoss: signal.stopLoss,
+        takeProfit: signal.takeProfit,
+        leverage: signal.leverage,
+        budget: recommendedBudget,
+        status: "open",
+      });
+      setPositionOpened(true);
+    } catch (err) {
+      console.error("Trade öffnen fehlgeschlagen:", err);
+    }
   }
 
   const c = isBold

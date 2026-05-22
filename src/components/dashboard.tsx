@@ -13,13 +13,17 @@ export default function Dashboard() {
   const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  function loadPortfolio() {
-    setPortfolio(getActivePortfolio());
+  async function loadPortfolio() {
+    try {
+      const p = await getActivePortfolio();
+      setPortfolio(p);
+    } catch (err) {
+      console.error("Portfolio laden fehlgeschlagen:", err);
+    }
   }
 
   useEffect(() => {
-    loadPortfolio();
-    setLoaded(true);
+    loadPortfolio().then(() => setLoaded(true));
   }, []);
 
   if (!loaded) return null;

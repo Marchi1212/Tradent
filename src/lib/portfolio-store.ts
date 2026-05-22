@@ -1,5 +1,7 @@
 "use client";
 
+import { createClient } from "@/lib/supabase/client";
+
 export interface Portfolio {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export interface Portfolio {
   currentBalance: number;
   riskSteady: number;
   riskBold: number;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -27,65 +30,139 @@ export interface Trade {
   closedAt?: string;
 }
 
-const PORTFOLIO_KEY = "tradent_portfolios";
-const ACTIVE_KEY = "tradent_active_portfolio";
-const TRADES_KEY = "tradent_trades";
-
-function isBrowser() {
-  return typeof window !== "undefined";
+// Supabase row → App-Typ
+function toPortfolio(row: Record<string, unknown>): Portfolio {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    budget: Number(row.budget),
+    currentBalance: Number(row.current_balance),
+    riskSteady: Number(row.risk_steady),
+    riskBold: Number(row.risk_bold),
+    isActive: row.is_active as boolean,
+    createdAt: row.created_at as string,
+  };
 }
 
-export function getPortfolios(): Portfolio[] {
-  if (!isBrowser()) return [];
-  const data = localStorage.getItem(PORTFOLIO_KEY);
-  return data ? JSON.parse(data) : [];
+function toTrade(row: Record<string, unknown>): Trade {
+  return {
+    id: row.id as string,
+    portfolioId: row.portfolio_id as string,
+    signalId: row.signal_id as string,
+    asset: row.asset as string,
+    direction: row.direction as string,
+    entry: Number(row.entry),
+    stopLoss: Number(row.stop_loss),
+    takeProfit: Number(row.take_profit),
+    leverage: row.leverage as string,
+    budget: Number(row.budget),
+    status: row.status as "open" | "closed",
+    result: row.result != null ? Number(row.result) : undefined,
+    openedAt: row.opened_at as string,
+    closedAt: row.closed_at as string | undefined,
+  };
 }
 
-export function getActivePortfolio(): Portfolio | null {
-  if (!isBrowser()) return null;
-  const id = localStorage.getItem(ACTIVE_KEY);
-  if (!id) return null;
-  return getPortfolios().find((p) => p.id === id) || null;
+async function getUserId(): Promise<string> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Nicht eingeloggt");
+  return user.id;
 }
 
-export function setActivePortfolio(id: string) {
-  if (!isBrowser()) return;
-  localStorage.setItem(ACTIVE_KEY, id);
+export async function getPortfolios(): Promise<Portfolio[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("portfolios")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(toPortfolio);
 }
 
-export function createPortfolio(data: {
+export async function getActivePortfolio(): Promise<Portfolio | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("portfolios")
+    .select("*")
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? toPortfolio(data) : null;
+}
+
+export async function setActivePortfolio(id: string): Promise<void> {
+  const supabase = createClient();
+  const userId = await getUserId();
+
+  // Alle deaktivieren
+  await supabase
+    .from("portfolios")
+    .update({ is_active: false })
+    .eq("user_id", userId);
+
+  // Gewähltes aktivieren
+  await supabase
+    .from("portfolios")
+    .update({ is_active: true })
+    .eq("id", id);
+}
+
+export async function createPortfolio(data: {
   name: string;
   budget: number;
   riskSteady: number;
   riskBold: number;
-}): Portfolio {
-  const portfolio: Portfolio = {
-    id: crypto.randomUUID(),
-    name: data.name,
-    budget: data.budget,
-    currentBalance: data.budget,
-    riskSteady: data.riskSteady,
-    riskBold: data.riskBold,
-    createdAt: new Date().toISOString(),
-  };
+}): Promise<Portfolio> {
+  const supabase = createClient();
+  const userId = await getUserId();
 
-  const portfolios = getPortfolios();
-  portfolios.push(portfolio);
-  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolios));
-  setActivePortfolio(portfolio.id);
+  // Alle bisherigen deaktivieren
+  await supabase
+    .from("portfolios")
+    .update({ is_active: false })
+    .eq("user_id", userId);
 
-  return portfolio;
+  const { data: row, error } = await supabase
+    .from("portfolios")
+    .insert({
+      user_id: userId,
+      name: data.name,
+      budget: data.budget,
+      current_balance: data.budget,
+      risk_steady: data.riskSteady,
+      risk_bold: data.riskBold,
+      is_active: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toPortfolio(row);
 }
 
-export function updatePortfolio(
+export async function updatePortfolio(
   id: string,
   updates: Partial<Pick<Portfolio, "name" | "budget" | "currentBalance" | "riskSteady" | "riskBold">>
-) {
-  const portfolios = getPortfolios();
-  const index = portfolios.findIndex((p) => p.id === id);
-  if (index === -1) return;
-  portfolios[index] = { ...portfolios[index], ...updates };
-  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(portfolios));
+): Promise<void> {
+  const supabase = createClient();
+
+  const dbUpdates: Record<string, unknown> = {};
+  if (updates.name !== undefined) dbUpdates.name = updates.name;
+  if (updates.budget !== undefined) dbUpdates.budget = updates.budget;
+  if (updates.currentBalance !== undefined) dbUpdates.current_balance = updates.currentBalance;
+  if (updates.riskSteady !== undefined) dbUpdates.risk_steady = updates.riskSteady;
+  if (updates.riskBold !== undefined) dbUpdates.risk_bold = updates.riskBold;
+
+  const { error } = await supabase
+    .from("portfolios")
+    .update(dbUpdates)
+    .eq("id", id);
+
+  if (error) throw error;
 }
 
 export function calculatePositionSize(
@@ -100,22 +177,51 @@ export function calculatePositionSize(
   return Math.min(positionSize, balance);
 }
 
-export function getTrades(portfolioId: string): Trade[] {
-  if (!isBrowser()) return [];
-  const data = localStorage.getItem(TRADES_KEY);
-  const trades: Trade[] = data ? JSON.parse(data) : [];
-  return trades.filter((t) => t.portfolioId === portfolioId);
+export async function getTrades(portfolioId: string): Promise<Trade[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("trades")
+    .select("*")
+    .eq("portfolio_id", portfolioId)
+    .order("opened_at", { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(toTrade);
 }
 
-export function addTrade(trade: Omit<Trade, "id" | "openedAt">): Trade {
-  const newTrade: Trade = {
-    ...trade,
-    id: crypto.randomUUID(),
-    openedAt: new Date().toISOString(),
-  };
-  const data = localStorage.getItem(TRADES_KEY);
-  const trades: Trade[] = data ? JSON.parse(data) : [];
-  trades.push(newTrade);
-  localStorage.setItem(TRADES_KEY, JSON.stringify(trades));
-  return newTrade;
+export async function addTrade(trade: {
+  portfolioId: string;
+  signalId: string;
+  asset: string;
+  direction: string;
+  entry: number;
+  stopLoss: number;
+  takeProfit: number;
+  leverage: string;
+  budget: number;
+  status: "open" | "closed";
+}): Promise<Trade> {
+  const supabase = createClient();
+  const userId = await getUserId();
+
+  const { data: row, error } = await supabase
+    .from("trades")
+    .insert({
+      user_id: userId,
+      portfolio_id: trade.portfolioId,
+      signal_id: trade.signalId,
+      asset: trade.asset,
+      direction: trade.direction,
+      entry: trade.entry,
+      stop_loss: trade.stopLoss,
+      take_profit: trade.takeProfit,
+      leverage: trade.leverage,
+      budget: trade.budget,
+      status: trade.status,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return toTrade(row);
 }

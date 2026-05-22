@@ -13,19 +13,25 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
   const [budget, setBudget] = useState("");
   const [riskSteady, setRiskSteady] = useState("2");
   const [riskBold, setRiskBold] = useState("5");
+  const [saving, setSaving] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name || !budget) return;
+    if (!name || !budget || saving) return;
 
-    createPortfolio({
-      name,
-      budget: parseFloat(budget),
-      riskSteady: parseFloat(riskSteady),
-      riskBold: parseFloat(riskBold),
-    });
-
-    onCreated();
+    setSaving(true);
+    try {
+      await createPortfolio({
+        name,
+        budget: parseFloat(budget),
+        riskSteady: parseFloat(riskSteady),
+        riskBold: parseFloat(riskBold),
+      });
+      onCreated();
+    } catch (err) {
+      console.error("Portfolio erstellen fehlgeschlagen:", err);
+      setSaving(false);
+    }
   }
 
   return (
@@ -119,9 +125,10 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
 
           <button
             type="submit"
-            className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+            disabled={saving}
+            className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
-            Portfolio eröffnen
+            {saving ? "Wird erstellt..." : "Portfolio eröffnen"}
           </button>
         </form>
       </div>

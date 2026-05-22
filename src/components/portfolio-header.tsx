@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Portfolio } from "@/lib/portfolio-store";
 import { updatePortfolio, getPortfolios, setActivePortfolio } from "@/lib/portfolio-store";
 
@@ -15,23 +15,41 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
   const [name, setName] = useState(portfolio.name);
   const [riskSteady, setRiskSteady] = useState(String(portfolio.riskSteady));
   const [riskBold, setRiskBold] = useState(String(portfolio.riskBold));
+  const [allPortfolios, setAllPortfolios] = useState<Portfolio[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const allPortfolios = getPortfolios();
+  useEffect(() => {
+    if (showSettings) {
+      getPortfolios().then(setAllPortfolios).catch(console.error);
+    }
+  }, [showSettings]);
 
-  function handleSave() {
-    updatePortfolio(portfolio.id, {
-      name,
-      riskSteady: parseFloat(riskSteady),
-      riskBold: parseFloat(riskBold),
-    });
-    setShowSettings(false);
-    onUpdate();
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await updatePortfolio(portfolio.id, {
+        name,
+        riskSteady: parseFloat(riskSteady),
+        riskBold: parseFloat(riskBold),
+      });
+      setShowSettings(false);
+      onUpdate();
+    } catch (err) {
+      console.error("Speichern fehlgeschlagen:", err);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleSwitch(id: string) {
-    setActivePortfolio(id);
-    setShowSettings(false);
-    onUpdate();
+  async function handleSwitch(id: string) {
+    try {
+      await setActivePortfolio(id);
+      setShowSettings(false);
+      onUpdate();
+    } catch (err) {
+      console.error("Portfolio wechseln fehlgeschlagen:", err);
+    }
   }
 
   return (
@@ -118,9 +136,10 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew }: Pr
 
             <button
               onClick={handleSave}
-              className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+              disabled={saving}
+              className="w-full rounded-[--radius-md] bg-accent py-3.5 text-sm font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
             >
-              Speichern
+              {saving ? "Speichert..." : "Speichern"}
             </button>
 
             {/* Andere Portfolios */}
