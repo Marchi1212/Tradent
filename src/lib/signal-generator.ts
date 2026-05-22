@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { fetchMarketDataForSession, type AssetMarketData } from "./market-data";
+import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, type AssetMarketData } from "./market-data";
+import { getTradingDayType, type TradingDayType } from "./market-hours";
 
 export interface GeneratedSignal {
   asset: string;
@@ -31,7 +32,7 @@ function formatMarketDataForPrompt(data: AssetMarketData[]): string {
     .join("\n\n");
 }
 
-const SYSTEM_PROMPT = `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten aus allen Assetklassen und identifizierst die 2 absolut besten Trading-Setups des Tages – unabhängig vom Markt.
+const SYSTEM_PROMPT_WEEKDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten aus allen Assetklassen und identifizierst die 2 absolut besten Trading-Setups des Tages – unabhängig vom Markt.
 
 Deine Analyse basiert auf:
 - Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
@@ -59,21 +60,103 @@ Regeln:
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-function buildUserPrompt(marketData: string, date: string): string {
-  return `Datum: ${date}
+const SYSTEM_PROMPT_WEEKEND = `Du bist ein erfahrener Krypto-Daytrading-Analyst. Es ist Wochenende – traditionelle Märkte sind geschlossen. Du analysierst die Krypto-Marktdaten tiefgehend und identifizierst die 2 besten Crypto-Trading-Setups.
 
-Handelszeiten (deutsche Zeit):
-- XETRA/EU-Aktien: 09:00–17:30
+Deine Analyse basiert auf:
+- Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
+- Crypto-spezifische Faktoren (Volumen-Muster am Wochenende, Whale-Bewegungen, On-Chain-Signale)
+- Preis-Action und Volatilität
+- Risk/Reward-Optimierung
+
+Du gibst genau 2 Signale aus:
+1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
+2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
+
+Regeln:
+- Alle Trades sind Krypto-CFDs auf XTB
+- Daytrading: Positionen werden innerhalb des Tages geöffnet und geschlossen
+- Risk-Reward-Ratio mindestens 1:1.5
+- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
+- Beide Assets MÜSSEN unterschiedlich sein
+- LONG und SHORT sind beide möglich
+- Krypto-Volatilität am Wochenende beachten (oft niedriger, aber mit plötzlichen Spikes)
+- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
+- optimalEntry = konkretes Zeitfenster (z.B. "10:00–12:00", "14:00–16:00")
+- marketCloseTime = "23:59" (Krypto 24/7, aber Trade soll am selben Tag geschlossen werden)
+- Begründung auf Deutsch, 2-3 Sätze
+- Performance first – analysiere jedes Asset sorgfältig
+
+Antworte ausschließlich mit JSON, kein anderer Text.`;
+
+const SYSTEM_PROMPT_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist ein deutscher Feiertag – XETRA und europäische Börsen sind geschlossen. US-Märkte, Forex, Rohstoffe und Krypto sind aber handelbar. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
+
+Deine Analyse basiert auf:
+- Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
+- Preis-Action und Volatilität
+- Risk/Reward-Optimierung
+
+Du gibst genau 2 Signale aus:
+1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
+2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
+
+Regeln:
+- Alle Trades sind CFD-Daytrading auf XTB
+- Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
+- Risk-Reward-Ratio mindestens 1:1.5
+- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
+- Wähle die 2 BESTEN Assets aus den VERFÜGBAREN Märkten (US, Forex, Rohstoffe, Krypto)
+- Beide Assets MÜSSEN unterschiedlich sein
+- LONG und SHORT sind beide möglich
+- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
+- optimalEntry = konkretes Zeitfenster
+- marketCloseTime = wann der Trade spätestens geschlossen werden muss
+- Begründung auf Deutsch, 2-3 Sätze
+- Performance first
+
+Antworte ausschließlich mit JSON, kein anderer Text.`;
+
+function getSystemPrompt(dayType: TradingDayType): string {
+  if (dayType === "weekend") return SYSTEM_PROMPT_WEEKEND;
+  if (dayType === "german_holiday") return SYSTEM_PROMPT_HOLIDAY;
+  return SYSTEM_PROMPT_WEEKDAY;
+}
+
+function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType): string {
+  const tradingHours = dayType === "weekend"
+    ? `Handelszeiten (deutsche Zeit):
+- Krypto: 24/7 – einziger handelbarer Markt am Wochenende`
+    : dayType === "german_holiday"
+      ? `Handelszeiten (deutsche Zeit):
 - NYSE/US-Aktien: 15:30–22:00
 - Forex: 24h (Mo–Fr)
 - Rohstoffe (COMEX/NYMEX): 08:20–20:30
 - Krypto: 24/7
+- XETRA/EU-Aktien: GESCHLOSSEN (Feiertag)`
+      : `Handelszeiten (deutsche Zeit):
+- XETRA/EU-Aktien: 09:00–17:30
+- NYSE/US-Aktien: 15:30–22:00
+- Forex: 24h (Mo–Fr)
+- Rohstoffe (COMEX/NYMEX): 08:20–20:30
+- Krypto: 24/7`;
+
+  const instruction = dayType === "weekend"
+    ? "Wähle die 2 absolut besten Krypto-Setups. Analysiere jedes Asset tiefgehend."
+    : dayType === "german_holiday"
+      ? "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein XETRA)."
+      : "Wähle die 2 absolut besten Setups aus ALLEN Assets.";
+
+  const exampleMarket = dayType === "weekend" ? "Krypto" : "XETRA";
+  const exampleCategory = dayType === "weekend" ? "Krypto" : "Index";
+
+  return `Datum: ${date}
+
+${tradingHours}
 
 Marktdaten:
 
 ${marketData}
 
-Wähle die 2 absolut besten Setups aus ALLEN Assets. Antworte NUR mit diesem JSON:
+${instruction} Antworte NUR mit diesem JSON:
 
 {
   "steady": {
@@ -88,10 +171,10 @@ Wähle die 2 absolut besten Setups aus ALLEN Assets. Antworte NUR mit diesem JSO
     "expectedGainPercent": 6.0,
     "riskRewardRatio": "1:2",
     "reasoning": "Begründung auf Deutsch...",
-    "market": "XETRA",
+    "market": "${exampleMarket}",
     "marketCloseTime": "17:30",
     "optimalEntry": "09:00–10:00",
-    "category": "Index"
+    "category": "${exampleCategory}"
   },
   "bold": {
     "asset": "Name",
@@ -105,23 +188,30 @@ Wähle die 2 absolut besten Setups aus ALLEN Assets. Antworte NUR mit diesem JSO
     "expectedGainPercent": 35.0,
     "riskRewardRatio": "1:2.5",
     "reasoning": "Begründung auf Deutsch...",
-    "market": "NYSE",
-    "marketCloseTime": "22:00",
+    "market": "Krypto",
+    "marketCloseTime": "23:59",
     "optimalEntry": "15:30–16:30",
-    "category": "Aktie"
+    "category": "Krypto"
   }
 }`;
 }
 
-// Alle Assets einer Session laden (eu = EU+Forex+Commodities+Crypto, us = US+Forex+Commodities+Crypto)
-async function fetchAllMarketData(): Promise<AssetMarketData[]> {
-  // Beide Sessions laden → alle Assets abgedeckt, Duplikate (Forex etc.) nur 1x
+// Marktdaten je nach Tagestyp laden
+async function fetchMarketDataForDayType(dayType: TradingDayType): Promise<AssetMarketData[]> {
+  if (dayType === "weekend") {
+    return fetchCryptoMarketData();
+  }
+
+  if (dayType === "german_holiday") {
+    return fetchNonXetraMarketData();
+  }
+
+  // Normaler Wochentag: alle Assets
   const [euData, usData] = await Promise.all([
     fetchMarketDataForSession("eu"),
     fetchMarketDataForSession("us"),
   ]);
 
-  // Deduplizieren nach Ticker
   const seen = new Set<string>();
   const combined: AssetMarketData[] = [];
   for (const d of [...euData, ...usData]) {
@@ -137,13 +227,20 @@ export async function generateSignals(): Promise<{
   steady: GeneratedSignal;
   bold: GeneratedSignal;
 }> {
-  // 1. Marktdaten für ALLE Assets laden
-  console.log("Lade Marktdaten für alle 47 Assets...");
-  const marketData = await fetchAllMarketData();
+  const dayType = getTradingDayType();
+  const modeLabel = dayType === "weekend" ? "Wochenende (nur Krypto)"
+    : dayType === "german_holiday" ? "Feiertag (ohne XETRA)"
+    : "Wochentag (alle Assets)";
 
-  if (marketData.length < 5) {
+  console.log(`Modus: ${modeLabel}`);
+
+  // 1. Marktdaten laden
+  const marketData = await fetchMarketDataForDayType(dayType);
+
+  const minAssets = dayType === "weekend" ? 3 : 5;
+  if (marketData.length < minAssets) {
     throw new Error(
-      `Zu wenig Marktdaten geladen (${marketData.length} Assets). Mindestens 5 benötigt.`
+      `Zu wenig Marktdaten geladen (${marketData.length} Assets). Mindestens ${minAssets} benötigt.`
     );
   }
 
@@ -164,11 +261,11 @@ export async function generateSignals(): Promise<{
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1500,
-    system: SYSTEM_PROMPT,
+    system: getSystemPrompt(dayType),
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today),
+        content: buildUserPrompt(formattedData, today, dayType),
       },
     ],
   });

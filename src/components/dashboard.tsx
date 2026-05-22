@@ -8,6 +8,7 @@ import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
 import PortfolioHeader from "./portfolio-header";
 import SignOutButton from "@/app/sign-out-button";
+import { isWeekend, isGermanHoliday } from "@/lib/market-hours";
 
 type Tab = "signals" | "trades";
 
@@ -150,7 +151,12 @@ export default function Dashboard() {
                 <div className="w-8 h-8 border-2 border-text-muted border-t-text-primary rounded-full animate-spin mb-4" />
                 <p className="text-sm font-semibold text-text-primary">Signale werden generiert…</p>
                 <p className="text-xs text-text-muted mt-1">
-                  47 Assets werden analysiert. Das kann bis zu 30 Sekunden dauern.
+                  {isWeekend()
+                    ? "12 Krypto-Assets werden analysiert."
+                    : isGermanHoliday()
+                      ? "US, Forex, Rohstoffe & Krypto werden analysiert."
+                      : "55 Assets werden analysiert."}{" "}
+                  Das kann bis zu 30 Sekunden dauern.
                 </p>
               </div>
             ) : signalsError ? (

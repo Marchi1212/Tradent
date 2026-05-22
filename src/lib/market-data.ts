@@ -66,11 +66,19 @@ export const WATCHLIST: WatchlistAsset[] = [
   { symbol: "BZ=F", name: "Öl (Brent)", ticker: "OIL", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
   { symbol: "NG=F", name: "Erdgas", ticker: "NATGAS", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
 
-  // ── Krypto (4) – beide Runden ──
+  // ── Krypto (12) – beide Runden, am Wochenende exklusiv ──
   { symbol: "BTC-USD", name: "Bitcoin", ticker: "BITCOIN", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
   { symbol: "ETH-USD", name: "Ethereum", ticker: "ETHEREUM", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
   { symbol: "SOL-USD", name: "Solana", ticker: "SOLANA", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
   { symbol: "XRP-USD", name: "Ripple", ticker: "RIPPLE", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "ADA-USD", name: "Cardano", ticker: "CARDANO", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "DOT-USD", name: "Polkadot", ticker: "POLKADOT", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "LINK-USD", name: "Chainlink", ticker: "CHAINLINK", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "AVAX-USD", name: "Avalanche", ticker: "AVALANCHE", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "LTC-USD", name: "Litecoin", ticker: "LITECOIN", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "DOGE-USD", name: "Dogecoin", ticker: "DOGECOIN", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "MATIC-USD", name: "Polygon", ticker: "POLYGON", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
+  { symbol: "UNI7083-USD", name: "Uniswap", ticker: "UNISWAP", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },
 ];
 
 export interface AssetMarketData {
@@ -169,14 +177,25 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
   }
 }
 
-// Assets für eine Session parallel laden (in Batches von 8)
-export async function fetchMarketDataForSession(session: SessionId): Promise<AssetMarketData[]> {
-  const filtered = WATCHLIST.filter((a) => a.sessions.includes(session));
+// Nur Crypto-Assets laden (für Wochenende)
+export async function fetchCryptoMarketData(): Promise<AssetMarketData[]> {
+  const cryptoAssets = WATCHLIST.filter((a) => a.category === "Krypto");
+  return fetchAssetBatch(cryptoAssets);
+}
+
+// Alle Assets OHNE XETRA laden (für deutsche Feiertage: US/Forex/Rohstoffe/Crypto offen)
+export async function fetchNonXetraMarketData(): Promise<AssetMarketData[]> {
+  const nonXetra = WATCHLIST.filter((a) => !["XETRA", "LSE", "JPX"].includes(a.market));
+  return fetchAssetBatch(nonXetra);
+}
+
+// Generische Batch-Loader-Funktion
+async function fetchAssetBatch(assets: WatchlistAsset[]): Promise<AssetMarketData[]> {
   const results: AssetMarketData[] = [];
   const batchSize = 8;
 
-  for (let i = 0; i < filtered.length; i += batchSize) {
-    const batch = filtered.slice(i, i + batchSize);
+  for (let i = 0; i < assets.length; i += batchSize) {
+    const batch = assets.slice(i, i + batchSize);
     const settled = await Promise.allSettled(batch.map(fetchSingleAsset));
 
     for (const result of settled) {
@@ -185,11 +204,16 @@ export async function fetchMarketDataForSession(session: SessionId): Promise<Ass
       }
     }
 
-    // Kurze Pause zwischen Batches
-    if (i + batchSize < WATCHLIST.length) {
+    if (i + batchSize < assets.length) {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
 
   return results;
+}
+
+// Assets für eine Session parallel laden
+export async function fetchMarketDataForSession(session: SessionId): Promise<AssetMarketData[]> {
+  const filtered = WATCHLIST.filter((a) => a.sessions.includes(session));
+  return fetchAssetBatch(filtered);
 }

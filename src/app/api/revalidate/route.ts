@@ -40,6 +40,8 @@ function getYahooSymbol(ticker: string): string {
     GOLD: "GC=F", SILVER: "SI=F", PLATINUM: "PL=F",
     "OIL.WTI": "CL=F", OIL: "BZ=F", NATGAS: "NG=F",
     BITCOIN: "BTC-USD", ETHEREUM: "ETH-USD", SOLANA: "SOL-USD", RIPPLE: "XRP-USD",
+    CARDANO: "ADA-USD", POLKADOT: "DOT-USD", CHAINLINK: "LINK-USD", AVALANCHE: "AVAX-USD",
+    LITECOIN: "LTC-USD", DOGECOIN: "DOGE-USD", POLYGON: "MATIC-USD", UNISWAP: "UNI7083-USD",
   };
   return map[ticker] || ticker;
 }
