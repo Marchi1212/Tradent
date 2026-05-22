@@ -64,7 +64,7 @@ export default function Dashboard() {
 
       {/* Tab Bar */}
       <div className="sticky top-[61px] z-10 bg-bg-primary px-5 pt-4 pb-2">
-        <div className="flex max-w-lg mx-auto rounded-[--radius-md] bg-bg-secondary p-1 gap-1">
+        <div className="flex max-w-[200px] mx-auto rounded-[--radius-md] bg-bg-secondary p-1 gap-1">
           <button
             onClick={() => setActiveTab("signals")}
             className={`flex-1 rounded-[--radius-btn] py-2 text-sm font-semibold text-center transition-colors ${
