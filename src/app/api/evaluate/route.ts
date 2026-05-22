@@ -112,6 +112,13 @@ function evaluateSignal(
 
 export async function GET(request: Request) {
   try {
+    // Cron-Schutz: nur Vercel Cron oder mit CRON_SECRET erlaubt
+    const authHeader = request.headers.get("authorization");
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
