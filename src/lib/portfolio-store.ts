@@ -241,6 +241,21 @@ export async function getTrades(portfolioId: string): Promise<Trade[]> {
   return (data || []).map(toTrade);
 }
 
+export async function getOpenTradeForSignal(portfolioId: string, signalId: string): Promise<Trade | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("trades")
+    .select("*")
+    .eq("portfolio_id", portfolioId)
+    .eq("signal_id", signalId)
+    .eq("status", "open")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? toTrade(data) : null;
+}
+
 export async function deletePortfolio(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase

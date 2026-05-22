@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
 import type { Portfolio } from "@/lib/portfolio-store";
+import { getOpenTradeForSignal } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 
 function ClockIcon({ className }: { className?: string }) {
@@ -40,6 +41,16 @@ export default function SignalCard({
     reason: string;
   } | null>(null);
   const [revalError, setRevalError] = useState<string | null>(null);
+
+  // Prüfen ob schon ein offener Trade für dieses Signal existiert
+  useEffect(() => {
+    if (!portfolio) return;
+    getOpenTradeForSignal(portfolio.id, signal.id)
+      .then((trade) => {
+        if (trade) setPositionOpened(true);
+      })
+      .catch(console.error);
+  }, [portfolio, signal.id]);
 
   useEffect(() => {
     // Bei offener Position jede Sekunde updaten (für smooth Countdown-Balken)
