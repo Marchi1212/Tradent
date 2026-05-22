@@ -1,7 +1,5 @@
 import type { Signal } from "./mock-signals";
-import type { SessionId } from "./sessions";
 
-// Server-seitiger Supabase Client für API-Routes
 async function getServerClient() {
   const { createClient } = await import("@/lib/supabase/server");
   return createClient();
@@ -30,10 +28,11 @@ function toSignal(row: Record<string, unknown>): Signal {
   };
 }
 
-// Signale für eine Session laden (server-seitig)
-export async function getSessionSignals(
-  session: SessionId
-): Promise<{ steady: Signal; bold: Signal } | null> {
+// Heutige Signale laden (server-seitig)
+export async function getTodaySignals(): Promise<{
+  steady: Signal;
+  bold: Signal;
+} | null> {
   const supabase = await getServerClient();
   const today = new Date().toISOString().split("T")[0];
 
@@ -41,7 +40,7 @@ export async function getSessionSignals(
     .from("signals")
     .select("*")
     .eq("date", today)
-    .eq("session", session);
+    .eq("session", "daily");
 
   if (error) throw error;
   if (!data || data.length < 2) return null;
@@ -54,8 +53,8 @@ export async function getSessionSignals(
   return { steady, bold };
 }
 
-// Prüfen ob Session-Signale existieren (server-seitig)
-export async function sessionSignalsExist(session: SessionId): Promise<boolean> {
+// Prüfen ob heute schon Signale existieren
+export async function todaySignalsExist(): Promise<boolean> {
   const supabase = await getServerClient();
   const today = new Date().toISOString().split("T")[0];
 
@@ -63,58 +62,55 @@ export async function sessionSignalsExist(session: SessionId): Promise<boolean> 
     .from("signals")
     .select("*", { count: "exact", head: true })
     .eq("date", today)
-    .eq("session", session);
+    .eq("session", "daily");
 
   if (error) return false;
   return (count ?? 0) >= 2;
 }
 
-// Signale für eine Session speichern (server-seitig)
-export async function saveSessionSignals(
-  session: SessionId,
-  signals: {
-    steady: {
-      asset: string;
-      ticker: string;
-      direction: string;
-      leverage: string;
-      entry: number;
-      stopLoss: number;
-      takeProfit: number;
-      confidence: number;
-      expectedGainPercent: number;
-      riskRewardRatio: string;
-      reasoning: string;
-      market: string;
-      marketCloseTime: string;
-      optimalEntry: string;
-      category: string;
-    };
-    bold: {
-      asset: string;
-      ticker: string;
-      direction: string;
-      leverage: string;
-      entry: number;
-      stopLoss: number;
-      takeProfit: number;
-      confidence: number;
-      expectedGainPercent: number;
-      riskRewardRatio: string;
-      reasoning: string;
-      market: string;
-      marketCloseTime: string;
-      optimalEntry: string;
-      category: string;
-    };
-  }
-): Promise<void> {
+// Signale speichern (server-seitig)
+export async function saveTodaySignals(signals: {
+  steady: {
+    asset: string;
+    ticker: string;
+    direction: string;
+    leverage: string;
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+    confidence: number;
+    expectedGainPercent: number;
+    riskRewardRatio: string;
+    reasoning: string;
+    market: string;
+    marketCloseTime: string;
+    optimalEntry: string;
+    category: string;
+  };
+  bold: {
+    asset: string;
+    ticker: string;
+    direction: string;
+    leverage: string;
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+    confidence: number;
+    expectedGainPercent: number;
+    riskRewardRatio: string;
+    reasoning: string;
+    market: string;
+    marketCloseTime: string;
+    optimalEntry: string;
+    category: string;
+  };
+}): Promise<void> {
   const supabase = await getServerClient();
   const today = new Date().toISOString().split("T")[0];
 
   const rows = [signals.steady, signals.bold].map((s, i) => ({
     date: today,
-    session,
+    session: "daily",
     risk_class: i === 0 ? "steady" : "bold",
     asset: s.asset,
     ticker: s.ticker,

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
-import type { SessionInfo } from "@/lib/sessions";
 import { getActivePortfolio, allocateCapital, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
@@ -28,29 +27,12 @@ function parseSignalInputs(signals: { steady: Signal; bold: Signal }) {
   });
 }
 
-interface SignalResponse {
-  status: "active" | "generating" | "upcoming" | "closed";
-  session: SessionInfo | null;
-  signals: { steady: Signal; bold: Signal } | null;
-  minutesLeft?: number;
-  minutesUntil?: number;
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-      <circle cx="8" cy="8" r="6.5" />
-      <path d="M8 4.5V8l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("signals");
   const [loaded, setLoaded] = useState(false);
-  const [signalData, setSignalData] = useState<SignalResponse | null>(null);
+  const [signals, setSignals] = useState<{ steady: Signal; bold: Signal } | null>(null);
   const [signalsLoading, setSignalsLoading] = useState(true);
   const [signalsError, setSignalsError] = useState<string | null>(null);
 
@@ -72,8 +54,12 @@ export default function Dashboard() {
         const err = await res.json().catch(() => ({ error: "Netzwerkfehler" }));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      const data: SignalResponse = await res.json();
-      setSignalData(data);
+      const data = await res.json();
+      if (data.signals?.steady && data.signals?.bold) {
+        setSignals(data.signals);
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
     } catch (err) {
       console.error("Signale laden fehlgeschlagen:", err);
       setSignalsError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -88,7 +74,6 @@ export default function Dashboard() {
 
   if (!loaded) return null;
 
-  const signals = signalData?.signals ?? null;
   const allocations = portfolio && signals
     ? allocateCapital(portfolio.currentBalance, parseSignalInputs(signals))
     : [0, 0];
@@ -98,73 +83,6 @@ export default function Dashboard() {
     day: "numeric",
     month: "long",
   });
-
-  // Session-Statusanzeige
-  function renderSessionBadge() {
-    if (!signalData || !signalData.session) return null;
-
-    const s = signalData.session;
-
-    if (signalData.status === "active" && signalData.minutesLeft) {
-      const h = Math.floor(signalData.minutesLeft / 60);
-      const m = signalData.minutesLeft % 60;
-      const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
-      return (
-        <div className="flex items-center gap-2 rounded-[6px] bg-bg-secondary px-3 py-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-xs font-semibold text-text-primary">{s.label}</span>
-          <span className="text-xs text-text-muted">· noch {timeStr}</span>
-        </div>
-      );
-    }
-
-    if (signalData.status === "generating") {
-      return (
-        <div className="flex items-center gap-2 rounded-[6px] bg-bg-secondary px-3 py-1.5">
-          <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-          <span className="text-xs font-semibold text-text-primary">{s.label}</span>
-          <span className="text-xs text-text-muted">· wird vorbereitet</span>
-        </div>
-      );
-    }
-
-    return null;
-  }
-
-  // Warte-Screen zwischen Sessions oder vor Handelsstart
-  function renderWaitingState() {
-    if (!signalData) return null;
-
-    if (signalData.status === "upcoming" && signalData.session && signalData.minutesUntil) {
-      const h = Math.floor(signalData.minutesUntil / 60);
-      const m = signalData.minutesUntil % 60;
-      const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
-      return (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <ClockIcon className="w-8 h-8 text-text-muted mb-4" />
-          <p className="text-sm font-semibold text-text-primary">
-            {signalData.session.label} startet in {timeStr}
-          </p>
-          <p className="text-xs text-text-muted mt-1">
-            Handelsfenster: {signalData.session.tradingWindow}
-          </p>
-        </div>
-      );
-    }
-
-    if (signalData.status === "closed") {
-      return (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <p className="text-sm font-semibold text-text-primary">Handelstag beendet</p>
-          <p className="text-xs text-text-muted mt-1">
-            Morgen ab 8:30 neue Signale
-          </p>
-        </div>
-      );
-    }
-
-    return null;
-  }
 
   return (
     <>
@@ -219,17 +137,13 @@ export default function Dashboard() {
       <main className="flex-1 px-5 py-6 w-full max-w-lg mx-auto space-y-6">
         {activeTab === "signals" ? (
           <>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-text-muted">{today}</p>
-              {renderSessionBadge()}
-            </div>
-
+            <p className="text-sm text-text-muted">{today}</p>
             {signalsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="w-8 h-8 border-2 border-text-muted border-t-text-primary rounded-full animate-spin mb-4" />
                 <p className="text-sm font-semibold text-text-primary">Signale werden generiert…</p>
                 <p className="text-xs text-text-muted mt-1">
-                  Marktdaten werden analysiert. Das kann bis zu 30 Sekunden dauern.
+                  47 Assets werden analysiert. Das kann bis zu 30 Sekunden dauern.
                 </p>
               </div>
             ) : signalsError ? (
@@ -248,9 +162,7 @@ export default function Dashboard() {
                 <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} />
                 <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} />
               </div>
-            ) : (
-              renderWaitingState()
-            )}
+            ) : null}
           </>
         ) : portfolio ? (
           <TradeHistory portfolioId={portfolio.id} />

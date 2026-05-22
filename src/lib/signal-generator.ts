@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchMarketDataForSession, type AssetMarketData } from "./market-data";
-import { SESSIONS, type SessionId } from "./sessions";
 
 export interface GeneratedSignal {
   asset: string;
@@ -32,44 +31,49 @@ function formatMarketDataForPrompt(data: AssetMarketData[]): string {
     .join("\n\n");
 }
 
-function buildSystemPrompt(session: SessionId): string {
-  const s = SESSIONS[session];
-  return `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten und identifizierst die 2 besten Trading-Setups für die ${s.label} (Handelsfenster ${s.tradingWindow}).
+const SYSTEM_PROMPT = `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten aus allen Assetklassen und identifizierst die 2 absolut besten Trading-Setups des Tages – unabhängig vom Markt.
 
 Deine Analyse basiert auf:
 - Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
 - Preis-Action und Volatilität
 - Risk/Reward-Optimierung
 
-Du gibst immer 2 Signale aus:
+Du gibst genau 2 Signale aus:
 1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
 2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
 
 Regeln:
 - Alle Trades sind CFD-Daytrading auf XTB
-- Trades werden INNERHALB des Handelsfensters ${s.tradingWindow} eröffnet und VOR Handelsschluss geschlossen
+- Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
 - Risk-Reward-Ratio mindestens 1:1.5
 - Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
 - Stop-Loss muss eng genug sein für Daytrading (Intraday-Levels)
+- Wähle die 2 BESTEN Assets – egal ob Index, Aktie, Forex, Rohstoff oder Krypto
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes Zeitfenster innerhalb von ${s.tradingWindow}
+- optimalEntry = konkretes Zeitfenster (z.B. "09:00–10:00" für EU, "15:30–16:30" für US)
+- marketCloseTime = wann der Markt schließt und der Trade spätestens geschlossen werden muss
 - Begründung auf Deutsch, 2-3 Sätze
+- Entscheide rein nach Qualität des Setups – Performance first
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
-}
 
-function buildUserPrompt(marketData: string, date: string, session: SessionId): string {
-  const s = SESSIONS[session];
+function buildUserPrompt(marketData: string, date: string): string {
   return `Datum: ${date}
-Session: ${s.label} (${s.tradingWindow})
+
+Handelszeiten (deutsche Zeit):
+- XETRA/EU-Aktien: 09:00–17:30
+- NYSE/US-Aktien: 15:30–22:00
+- Forex: 24h (Mo–Fr)
+- Rohstoffe (COMEX/NYMEX): 08:20–20:30
+- Krypto: 24/7
 
 Marktdaten:
 
 ${marketData}
 
-Analysiere alle Assets und wähle die 2 besten Setups für das Handelsfenster ${s.tradingWindow}. Antworte NUR mit diesem JSON:
+Wähle die 2 absolut besten Setups aus ALLEN Assets. Antworte NUR mit diesem JSON:
 
 {
   "steady": {
@@ -109,23 +113,41 @@ Analysiere alle Assets und wähle die 2 besten Setups für das Handelsfenster ${
 }`;
 }
 
-export async function generateSignals(session: SessionId): Promise<{
+// Alle Assets einer Session laden (eu = EU+Forex+Commodities+Crypto, us = US+Forex+Commodities+Crypto)
+async function fetchAllMarketData(): Promise<AssetMarketData[]> {
+  // Beide Sessions laden → alle Assets abgedeckt, Duplikate (Forex etc.) nur 1x
+  const [euData, usData] = await Promise.all([
+    fetchMarketDataForSession("eu"),
+    fetchMarketDataForSession("us"),
+  ]);
+
+  // Deduplizieren nach Ticker
+  const seen = new Set<string>();
+  const combined: AssetMarketData[] = [];
+  for (const d of [...euData, ...usData]) {
+    if (!seen.has(d.ticker)) {
+      seen.add(d.ticker);
+      combined.push(d);
+    }
+  }
+  return combined;
+}
+
+export async function generateSignals(): Promise<{
   steady: GeneratedSignal;
   bold: GeneratedSignal;
 }> {
-  const s = SESSIONS[session];
+  // 1. Marktdaten für ALLE Assets laden
+  console.log("Lade Marktdaten für alle 47 Assets...");
+  const marketData = await fetchAllMarketData();
 
-  // 1. Marktdaten für diese Session laden
-  console.log(`[${s.label}] Lade Marktdaten...`);
-  const marketData = await fetchMarketDataForSession(session);
-
-  if (marketData.length < 3) {
+  if (marketData.length < 5) {
     throw new Error(
-      `Zu wenig Marktdaten für ${s.label} (${marketData.length} Assets). Mindestens 3 benötigt.`
+      `Zu wenig Marktdaten geladen (${marketData.length} Assets). Mindestens 5 benötigt.`
     );
   }
 
-  console.log(`[${s.label}] ${marketData.length} Assets geladen. Rufe Claude API auf...`);
+  console.log(`${marketData.length} Assets geladen. Rufe Claude API auf...`);
 
   // 2. Claude API aufrufen
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -142,11 +164,11 @@ export async function generateSignals(session: SessionId): Promise<{
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1500,
-    system: buildSystemPrompt(session),
+    system: SYSTEM_PROMPT,
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today, session),
+        content: buildUserPrompt(formattedData, today),
       },
     ],
   });
@@ -176,7 +198,7 @@ export async function generateSignals(session: SessionId): Promise<{
   parsed.bold.riskClass = "bold";
 
   console.log(
-    `[${s.label}] Signale generiert: ${parsed.steady.asset} (Steady) + ${parsed.bold.asset} (Bold)`
+    `Signale generiert: ${parsed.steady.asset} (Steady, ${parsed.steady.market}) + ${parsed.bold.asset} (Bold, ${parsed.bold.market})`
   );
 
   return parsed;
