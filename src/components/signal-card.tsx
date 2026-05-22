@@ -27,6 +27,20 @@ export default function SignalCard({
   const [positionOpened, setPositionOpened] = useState(false);
   const [marketInfo, setMarketInfo] = useState(getMarketInfo(signal.market));
 
+  // Revalidierungs-State
+  const [revalidating, setRevalidating] = useState(false);
+  const [revalidation, setRevalidation] = useState<{
+    valid: boolean;
+    currentPrice: number;
+    priceDiffPercent: number;
+    entry: number;
+    stopLoss: number;
+    takeProfit: number;
+    confidence: number;
+    reason: string;
+  } | null>(null);
+  const [revalError, setRevalError] = useState<string | null>(null);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setMarketInfo(getMarketInfo(signal.market));
@@ -59,8 +73,49 @@ export default function SignalCard({
   const exampleBudget = 200;
   const exampleGain = (exampleBudget * leverage * tpPercent / 100).toFixed(0);
 
-  async function handleOpenPosition() {
+  // Schritt 1: Revalidierung starten
+  async function handleRevalidate() {
     if (!portfolio || allocatedBudget <= 0) return;
+    try {
+      setRevalidating(true);
+      setRevalError(null);
+      setRevalidation(null);
+
+      const res = await fetch("/api/revalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asset: signal.asset,
+          ticker: signal.ticker,
+          direction: signal.direction,
+          entry: signal.entry,
+          stopLoss: signal.stopLoss,
+          takeProfit: signal.takeProfit,
+          leverage: signal.leverage,
+          confidence: signal.confidence,
+          reasoning: signal.reasoning,
+          market: signal.market,
+          category: signal.category,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Netzwerkfehler" }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setRevalidation(data);
+    } catch (err) {
+      setRevalError(err instanceof Error ? err.message : "Revalidierung fehlgeschlagen");
+    } finally {
+      setRevalidating(false);
+    }
+  }
+
+  // Schritt 2: Trade mit aktualisierten Werten bestätigen
+  async function handleConfirmPosition() {
+    if (!portfolio || allocatedBudget <= 0 || !revalidation) return;
     try {
       const { addTrade } = await import("@/lib/portfolio-store");
       await addTrade({
@@ -68,17 +123,24 @@ export default function SignalCard({
         signalId: signal.id,
         asset: signal.asset,
         direction: signal.direction,
-        entry: signal.entry,
-        stopLoss: signal.stopLoss,
-        takeProfit: signal.takeProfit,
+        entry: revalidation.entry,
+        stopLoss: revalidation.stopLoss,
+        takeProfit: revalidation.takeProfit,
         leverage: signal.leverage,
         budget: allocatedBudget,
         status: "open",
       });
       setPositionOpened(true);
+      setRevalidation(null);
     } catch (err) {
       console.error("Trade öffnen fehlgeschlagen:", err);
     }
+  }
+
+  // Abbrechen
+  function handleCancelRevalidation() {
+    setRevalidation(null);
+    setRevalError(null);
   }
 
   // Farb-Schema: Steady = hell, Bold = invertiert
@@ -234,16 +296,8 @@ export default function SignalCard({
           {/* Position eröffnen – nur mit Portfolio */}
           {hasPortfolio && (
             <>
-              {!positionOpened ? (
-                <div className={`pt-4 border-t ${c.border}`}>
-                  <button
-                    onClick={handleOpenPosition}
-                    className={`w-full rounded-[6px] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
-                  >
-                    Position eröffnen · {allocatedBudget}€
-                  </button>
-                </div>
-              ) : (
+              {positionOpened ? (
+                /* ── Position aktiv ── */
                 <div className={`pt-4 border-t ${c.border} space-y-3`}>
                   <div className="flex items-center justify-between">
                     <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
@@ -253,6 +307,118 @@ export default function SignalCard({
                     className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
                   >
                     Position schließen
+                  </button>
+                </div>
+              ) : revalidating ? (
+                /* ── Wird geprüft ── */
+                <div className={`pt-4 border-t ${c.border}`}>
+                  <div className="flex items-center justify-center gap-2 py-3.5">
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
+                    <span className={`text-sm font-bold ${c.text}`}>Kurs wird geprüft…</span>
+                  </div>
+                </div>
+              ) : revalidation ? (
+                /* ── Revalidierungs-Ergebnis ── */
+                <div className={`pt-4 border-t ${c.border} space-y-3`}>
+                  {revalidation.valid ? (
+                    <>
+                      {/* Bestätigt */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-500 text-base">✓</span>
+                        <span className={`text-sm font-bold ${c.text}`}>Trade bestätigt</span>
+                        <span className={`text-xs ${c.textMut} ml-auto`}>
+                          Konfidenz: {revalidation.confidence}%
+                        </span>
+                      </div>
+                      <p className={`text-xs ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
+
+                      {/* Aktualisierte Werte */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <p className={`text-[11px] ${c.textMut} uppercase`}>Entry</p>
+                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
+                            {revalidation.entry.toLocaleString("de-DE")}
+                          </p>
+                          {revalidation.entry !== signal.entry && (
+                            <p className={`text-[10px] ${c.textMut} line-through`}>
+                              {signal.entry.toLocaleString("de-DE")}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className={`text-[11px] ${c.textMut} uppercase`}>Stop-Loss</p>
+                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
+                            {revalidation.stopLoss.toLocaleString("de-DE")}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-[11px] ${c.textMut} uppercase`}>Take-Profit</p>
+                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
+                            {revalidation.takeProfit.toLocaleString("de-DE")}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Bestätigen / Abbrechen */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleConfirmPosition}
+                          className={`flex-1 rounded-[6px] ${c.btnBg} py-3 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                        >
+                          Bestätigen · {allocatedBudget}€
+                        </button>
+                        <button
+                          onClick={handleCancelRevalidation}
+                          className={`rounded-[6px] px-4 py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Trade ungültig */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-500 text-base">✕</span>
+                        <span className={`text-sm font-bold ${c.text}`}>Trade nicht mehr empfohlen</span>
+                      </div>
+                      <p className={`text-xs ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
+                      <button
+                        onClick={handleCancelRevalidation}
+                        className={`w-full rounded-[6px] py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
+                      >
+                        Verstanden
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : revalError ? (
+                /* ── Fehler ── */
+                <div className={`pt-4 border-t ${c.border} space-y-2`}>
+                  <p className={`text-xs ${c.textSec}`}>{revalError}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRevalidate}
+                      className={`flex-1 rounded-[6px] ${c.btnBg} py-3 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                    >
+                      Erneut prüfen
+                    </button>
+                    <button
+                      onClick={handleCancelRevalidation}
+                      className={`rounded-[6px] px-4 py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ── Position eröffnen Button ── */
+                <div className={`pt-4 border-t ${c.border}`}>
+                  <button
+                    onClick={handleRevalidate}
+                    className={`w-full rounded-[6px] ${c.btnBg} py-3.5 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
+                  >
+                    Position eröffnen · {allocatedBudget}€
                   </button>
                 </div>
               )}
