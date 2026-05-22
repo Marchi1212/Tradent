@@ -144,18 +144,16 @@ export default function SignalCard({
         {/* Expected Gain */}
         <div className="flex items-center justify-between mt-5">
           <div className={`${c.gainBg} rounded-[6px] px-3 py-1.5`}>
-            <p className={`text-sm ${c.textSec}`}>
-              <span className={`font-bold ${c.text}`}>+{signal.expectedGainPercent}%</span>
-              <span className={c.textMut}> · </span>
+            <p className={`text-sm ${c.text}`}>
+              <span className="font-bold">+{signal.expectedGainPercent}%</span>
+              {" · "}
               {hasPortfolio ? (
                 <>
-                  <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
-                  <span className={c.textMut}> bei {allocatedBudget}€</span>
+                  +{expectedGainEuro}€ bei {allocatedBudget}€
                 </>
               ) : (
                 <>
-                  <span className={`font-bold ${c.text}`}>+{exampleGain}€</span>
-                  <span className={c.textMut}> bei {exampleBudget}€</span>
+                  +{exampleGain}€ bei {exampleBudget}€
                 </>
               )}
             </p>
