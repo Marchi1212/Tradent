@@ -256,6 +256,53 @@ export async function getOpenTradeForSignal(portfolioId: string, signalId: strin
   return data ? toTrade(data) : null;
 }
 
+export async function closeTrade(
+  tradeId: string,
+  exitPrice: number,
+  result: number
+): Promise<void> {
+  const supabase = createClient();
+
+  // 1. Trade schließen
+  const { error: tradeError } = await supabase
+    .from("trades")
+    .update({
+      status: "closed",
+      result,
+      closed_at: new Date().toISOString(),
+    })
+    .eq("id", tradeId);
+
+  if (tradeError) throw tradeError;
+
+  // 2. Trade laden um Portfolio-ID zu bekommen
+  const { data: trade, error: fetchError } = await supabase
+    .from("trades")
+    .select("portfolio_id, budget")
+    .eq("id", tradeId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  // 3. Portfolio-Guthaben aktualisieren (Budget + Ergebnis)
+  const { data: portfolio, error: portfolioError } = await supabase
+    .from("portfolios")
+    .select("current_balance")
+    .eq("id", trade.portfolio_id)
+    .single();
+
+  if (portfolioError) throw portfolioError;
+
+  const newBalance = Number(portfolio.current_balance) + result;
+
+  const { error: updateError } = await supabase
+    .from("portfolios")
+    .update({ current_balance: newBalance })
+    .eq("id", trade.portfolio_id);
+
+  if (updateError) throw updateError;
+}
+
 export async function deletePortfolio(id: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase

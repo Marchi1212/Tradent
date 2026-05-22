@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
 import type { Portfolio } from "@/lib/portfolio-store";
-import { getOpenTradeForSignal } from "@/lib/portfolio-store";
+import { getOpenTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 
 function ClockIcon({ className }: { className?: string }) {
@@ -42,12 +42,25 @@ export default function SignalCard({
   } | null>(null);
   const [revalError, setRevalError] = useState<string | null>(null);
 
+  // Close-Position State
+  const [openTrade, setOpenTrade] = useState<Trade | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closeResult, setCloseResult] = useState<{
+    exitPrice: number;
+    pnl: number;
+    pnlPercent: number;
+  } | null>(null);
+  const [positionClosed, setPositionClosed] = useState(false);
+
   // Prüfen ob schon ein offener Trade für dieses Signal existiert
   useEffect(() => {
     if (!portfolio) return;
     getOpenTradeForSignal(portfolio.id, signal.id)
       .then((trade) => {
-        if (trade) setPositionOpened(true);
+        if (trade) {
+          setPositionOpened(true);
+          setOpenTrade(trade);
+        }
       })
       .catch(console.error);
   }, [portfolio, signal.id]);
@@ -131,7 +144,7 @@ export default function SignalCard({
     if (!portfolio || allocatedBudget <= 0 || !revalidation) return;
     try {
       const { addTrade } = await import("@/lib/portfolio-store");
-      await addTrade({
+      const trade = await addTrade({
         portfolioId: portfolio.id,
         signalId: signal.id,
         asset: signal.asset,
@@ -143,6 +156,7 @@ export default function SignalCard({
         budget: allocatedBudget,
         status: "open",
       });
+      setOpenTrade(trade);
       setPositionOpened(true);
       setRevalidation(null);
     } catch (err) {
@@ -154,6 +168,49 @@ export default function SignalCard({
   function handleCancelRevalidation() {
     setRevalidation(null);
     setRevalError(null);
+  }
+
+  // Position schließen: aktuellen Kurs holen + P&L berechnen
+  async function handleClosePosition() {
+    if (!openTrade) return;
+    try {
+      setClosing(true);
+      const res = await fetch(`/api/price?ticker=${encodeURIComponent(signal.ticker)}`);
+      if (!res.ok) throw new Error("Kurs nicht verfügbar");
+
+      const { price } = await res.json();
+      const leverage = parseFloat(signal.leverage);
+
+      // P&L berechnen
+      const priceDiff = openTrade.direction === "LONG"
+        ? price - openTrade.entry
+        : openTrade.entry - price;
+      const pnlPercent = (priceDiff / openTrade.entry) * 100 * leverage;
+      const pnl = openTrade.budget * (pnlPercent / 100);
+
+      setCloseResult({
+        exitPrice: price,
+        pnl: Math.round(pnl * 100) / 100,
+        pnlPercent: Math.round(pnlPercent * 100) / 100,
+      });
+    } catch (err) {
+      console.error("Kurs laden fehlgeschlagen:", err);
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  // Position endgültig schließen + Portfolio updaten
+  async function handleConfirmClose() {
+    if (!openTrade || !closeResult) return;
+    try {
+      await closeTrade(openTrade.id, closeResult.exitPrice, closeResult.pnl);
+      setPositionClosed(true);
+      setPositionOpened(false);
+      setCloseResult(null);
+    } catch (err) {
+      console.error("Position schließen fehlgeschlagen:", err);
+    }
   }
 
   // Farb-Schema: Steady = hell, Bold = invertiert
@@ -339,18 +396,76 @@ export default function SignalCard({
           {/* Position eröffnen – nur mit Portfolio */}
           {hasPortfolio && (
             <>
-              {positionOpened ? (
+              {positionClosed ? (
+                /* ── Position geschlossen ── */
+                <div className={`pt-4 border-t ${c.border} space-y-2`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-sm font-bold ${c.text}`}>Position geschlossen</span>
+                    <span className={`text-sm font-bold ${closeResult && closeResult.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {closeResult && closeResult.pnl >= 0 ? "+" : ""}{closeResult?.pnl}€
+                    </span>
+                  </div>
+                </div>
+              ) : positionOpened ? (
                 /* ── Position aktiv ── */
                 <div className={`pt-4 border-t ${c.border} space-y-3`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
-                    <span className={`text-sm ${c.textSec}`}>{allocatedBudget}€</span>
-                  </div>
-                  <button
-                    className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
-                  >
-                    Position schließen
-                  </button>
+                  {closing ? (
+                    <div className="flex items-center justify-center gap-2 py-3.5">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-50" />
+                      <span className={`text-sm font-bold ${c.text}`}>Aktueller Kurs wird geladen…</span>
+                    </div>
+                  ) : closeResult ? (
+                    <>
+                      {/* P&L Vorschau */}
+                      <div className="flex items-center justify-between">
+                        <span className={`text-sm font-bold ${c.text}`}>Ergebnis</span>
+                        <span className={`text-sm font-bold ${closeResult.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
+                          {closeResult.pnl >= 0 ? "+" : ""}{closeResult.pnl}€ ({closeResult.pnl >= 0 ? "+" : ""}{closeResult.pnlPercent}%)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className={`text-[11px] ${c.textMut} uppercase`}>Entry</p>
+                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
+                            {openTrade?.entry.toLocaleString("de-DE")}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`text-[11px] ${c.textMut} uppercase`}>Exit (aktuell)</p>
+                          <p className={`text-sm font-bold ${c.text} mt-0.5`}>
+                            {closeResult.exitPrice.toLocaleString("de-DE")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleConfirmClose}
+                          className={`flex-1 rounded-[6px] ${closeResult.pnl >= 0 ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"} py-3 text-sm font-bold text-white transition-colors`}
+                        >
+                          Schließen · {closeResult.pnl >= 0 ? "+" : ""}{closeResult.pnl}€
+                        </button>
+                        <button
+                          onClick={() => setCloseResult(null)}
+                          className={`rounded-[6px] px-4 py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
+                        <span className={`text-sm ${c.textSec}`}>{openTrade?.budget || allocatedBudget}€</span>
+                      </div>
+                      <button
+                        onClick={handleClosePosition}
+                        className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${c.btnOutline}`}
+                      >
+                        Position schließen
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : revalidating ? (
                 /* ── Wird geprüft ── */
