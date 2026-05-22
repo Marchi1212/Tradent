@@ -11,8 +11,6 @@ interface Props {
 export default function CreatePortfolio({ onCreated, onCancel }: Props) {
   const [name, setName] = useState("");
   const [budget, setBudget] = useState("");
-  const [riskSteady, setRiskSteady] = useState("2");
-  const [riskBold, setRiskBold] = useState("5");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -24,8 +22,8 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
       await createPortfolio({
         name,
         budget: parseFloat(budget),
-        riskSteady: parseFloat(riskSteady),
-        riskBold: parseFloat(riskBold),
+        riskSteady: 0,
+        riskBold: 0,
       });
       onCreated();
     } catch (err) {
@@ -78,50 +76,10 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-text-muted">€</span>
             </div>
+            <p className="text-xs text-text-muted mt-1.5">
+              Die Positionsgröße wird automatisch per Kelly-Formel berechnet.
+            </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-semibold text-text-primary mb-2">Risiko Steady</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={riskSteady}
-                  onChange={(e) => setRiskSteady(e.target.value)}
-                  min="0.5" max="10" step="0.5"
-                  className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary outline-none focus:border-text-muted pr-10"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-text-muted">%</span>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-text-primary mb-2">Risiko Bold</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={riskBold}
-                  onChange={(e) => setRiskBold(e.target.value)}
-                  min="0.5" max="10" step="0.5"
-                  className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary outline-none focus:border-text-muted pr-10"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-text-muted">%</span>
-              </div>
-            </div>
-          </div>
-
-          {budget && (
-            <div className="rounded-[12px] bg-bg-secondary p-4 space-y-2">
-              <p className="text-[11px] text-text-muted uppercase font-semibold">Vorschau</p>
-              <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">Max. Verlust Steady</span>
-                <span className="font-semibold">{(parseFloat(budget) * parseFloat(riskSteady || "0") / 100).toFixed(2)}€</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">Max. Verlust Bold</span>
-                <span className="font-semibold">{(parseFloat(budget) * parseFloat(riskBold || "0") / 100).toFixed(2)}€</span>
-              </div>
-            </div>
-          )}
 
           <button
             type="submit"
