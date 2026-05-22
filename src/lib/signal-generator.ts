@@ -130,7 +130,7 @@ export async function generateSignals(): Promise<{
   const formattedData = formatMarketDataForPrompt(marketData);
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-3-7-sonnet-latest",
     max_tokens: 1500,
     system: SYSTEM_PROMPT,
     messages: [
