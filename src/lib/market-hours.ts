@@ -1,7 +1,11 @@
 // Handelszeiten der Märkte (deutsche Zeit / CET)
 const MARKET_HOURS: Record<string, { open: number; close: number; label: string }> = {
-  XETRA: { open: 9, close: 17.5, label: "XETRA" }, // 17:30
-  NYSE: { open: 15.5, close: 22, label: "NYSE" }, // 15:30 - 22:00
+  XETRA: { open: 9, close: 17.5, label: "XETRA" },       // 09:00 - 17:30
+  NYSE: { open: 15.5, close: 22, label: "NYSE" },          // 15:30 - 22:00
+  LSE: { open: 9, close: 17.5, label: "LSE" },             // 09:00 - 17:30
+  Forex: { open: 0, close: 24, label: "24/5" },            // 24h Mo-Fr
+  COMEX: { open: 8.33, close: 20.5, label: "COMEX" },      // 08:20 - 20:30
+  NYMEX: { open: 8.33, close: 20.5, label: "NYMEX" },      // 08:20 - 20:30
   Krypto: { open: 0, close: 24, label: "24/7" },
 };
 

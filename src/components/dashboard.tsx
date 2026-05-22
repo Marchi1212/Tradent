@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { todaySignals } from "@/lib/mock-signals";
+import type { Signal } from "@/lib/mock-signals";
 import { getActivePortfolio, allocateCapital, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
@@ -11,7 +11,7 @@ import SignOutButton from "@/app/sign-out-button";
 
 type Tab = "signals" | "trades";
 
-function parseSignalInputs(signals: typeof todaySignals) {
+function parseSignalInputs(signals: { steady: Signal; bold: Signal }) {
   return [signals.steady, signals.bold].map((s) => {
     const slPercent =
       s.direction === "LONG"
@@ -32,6 +32,9 @@ export default function Dashboard() {
   const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("signals");
   const [loaded, setLoaded] = useState(false);
+  const [signals, setSignals] = useState<{ steady: Signal; bold: Signal } | null>(null);
+  const [signalsLoading, setSignalsLoading] = useState(true);
+  const [signalsError, setSignalsError] = useState<string | null>(null);
 
   async function loadPortfolio() {
     try {
@@ -42,16 +45,38 @@ export default function Dashboard() {
     }
   }
 
+  async function loadSignals() {
+    try {
+      setSignalsLoading(true);
+      setSignalsError(null);
+      const res = await fetch("/api/signals");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Netzwerkfehler" }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.steady && data.bold) {
+        setSignals(data);
+      } else {
+        throw new Error("Ungültige Signal-Daten");
+      }
+    } catch (err) {
+      console.error("Signale laden fehlgeschlagen:", err);
+      setSignalsError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setSignalsLoading(false);
+    }
+  }
+
   useEffect(() => {
-    loadPortfolio().then(() => setLoaded(true));
+    Promise.all([loadPortfolio(), loadSignals()]).then(() => setLoaded(true));
   }, []);
 
   if (!loaded) return null;
 
   // Kelly-basierte Kapitalaufteilung
-  const signalInputs = parseSignalInputs(todaySignals);
-  const allocations = portfolio
-    ? allocateCapital(portfolio.currentBalance, signalInputs)
+  const allocations = portfolio && signals
+    ? allocateCapital(portfolio.currentBalance, parseSignalInputs(signals))
     : [0, 0];
 
   const today = new Date().toLocaleDateString("de-DE", {
@@ -114,10 +139,31 @@ export default function Dashboard() {
         {activeTab === "signals" ? (
           <>
             <p className="text-sm text-text-muted">{today}</p>
-            <div className="space-y-4">
-              <SignalCard signal={todaySignals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} />
-              <SignalCard signal={todaySignals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} />
-            </div>
+            {signalsLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-8 h-8 border-2 border-text-muted border-t-text-primary rounded-full animate-spin mb-4" />
+                <p className="text-sm font-semibold text-text-primary">Signale werden generiert…</p>
+                <p className="text-xs text-text-muted mt-1">
+                  Marktdaten werden analysiert. Das kann beim ersten Mal bis zu 30 Sekunden dauern.
+                </p>
+              </div>
+            ) : signalsError ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <p className="text-sm font-semibold text-text-primary">Signale konnten nicht geladen werden</p>
+                <p className="text-xs text-text-muted mt-1">{signalsError}</p>
+                <button
+                  onClick={loadSignals}
+                  className="mt-4 rounded-[6px] bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
+                >
+                  Erneut versuchen
+                </button>
+              </div>
+            ) : signals ? (
+              <div className="space-y-4">
+                <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} />
+                <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} />
+              </div>
+            ) : null}
           </>
         ) : portfolio ? (
           <TradeHistory portfolioId={portfolio.id} />
