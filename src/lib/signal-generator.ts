@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, type AssetMarketData } from "./market-data";
 import { getTradingDayType, type TradingDayType } from "./market-hours";
+import { fetchMarketContext, formatMarketContextForPrompt } from "./market-context";
 
 export interface GeneratedSignal {
   asset: string;
@@ -34,10 +35,13 @@ function formatMarketDataForPrompt(data: AssetMarketData[]): string {
 
 const SYSTEM_PROMPT_WEEKDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten aus allen Assetklassen und identifizierst die 2 absolut besten Trading-Setups des Tages – unabhängig vom Markt.
 
-Deine Analyse basiert auf:
-- Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
-- Preis-Action und Volatilität
-- Risk/Reward-Optimierung
+ANALYSE-HIERARCHIE (Gewichtung):
+1. PRIMÄR – Technische Analyse (Kernentscheidung):
+   RSI14 + SMA20 + Price Action bestimmen Richtung. Momentum (1T/5T) bestätigt Trend. Support/Resistance (5T-Hoch/Tief) definieren Entry/SL/TP.
+2. SEKUNDÄR – Event-Filter (Veto-Funktion):
+   Earnings heute/morgen → Aktie NICHT traden oder Konfidenz -20-30%. FOMC/EZB/NFP/CPI heute → betroffene Märkte meiden oder Hebel halbieren.
+3. TERTIÄR – Sentiment (Feinjustierung ±5-10%):
+   Fear & Greed Extreme (<20 oder >80) verschieben Konfidenz als Kontraindikator.
 
 Du gibst genau 2 Signale aus:
 1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
@@ -55,18 +59,17 @@ Regeln:
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes Zeitfenster mit bester Liquidität (z.B. "09:00–10:00" für EU-Indizes, "15:30–16:30" für US)
 - marketCloseTime = XTB-Handelsschluss (z.B. "22:00" für EU-Index-CFDs, "23:00" für US-Index-CFDs, "17:30" für EU-Aktien, "22:00" für US-Aktien)
-- Begründung auf Deutsch, 2-3 Sätze
-- Entscheide rein nach Qualität des Setups – Performance first
+- Begründung auf Deutsch, 2-3 Sätze – erwähne Sentiment/Events wenn relevant
+- Entscheide nach Qualität des Setups UND berücksichtige Marktkontext
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
 const SYSTEM_PROMPT_WEEKEND = `Du bist ein erfahrener Krypto-Daytrading-Analyst. Es ist Wochenende – traditionelle Märkte sind geschlossen. Du analysierst die Krypto-Marktdaten tiefgehend und identifizierst die 2 besten Crypto-Trading-Setups.
 
-Deine Analyse basiert auf:
-- Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
-- Crypto-spezifische Faktoren (Volumen-Muster am Wochenende, Whale-Bewegungen, On-Chain-Signale)
-- Preis-Action und Volatilität
-- Risk/Reward-Optimierung
+ANALYSE-HIERARCHIE (Gewichtung):
+1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
+2. SEKUNDÄR – Crypto Fear & Greed als Kontraindikator bei Extremen (±5-10% Konfidenz)
+3. Crypto-spezifisch: Volumen-Muster am Wochenende, Volatilitäts-Levels
 
 Du gibst genau 2 Signale aus:
 1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
@@ -90,10 +93,10 @@ Antworte ausschließlich mit JSON, kein anderer Text.`;
 
 const SYSTEM_PROMPT_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist ein deutscher Feiertag – XETRA und europäische Börsen sind geschlossen. US-Märkte, Forex, Rohstoffe und Krypto sind aber handelbar. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
 
-Deine Analyse basiert auf:
-- Technische Analyse (Trend, Momentum, Support/Resistance, RSI, SMA)
-- Preis-Action und Volatilität
-- Risk/Reward-Optimierung
+ANALYSE-HIERARCHIE (Gewichtung):
+1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
+2. SEKUNDÄR – Event-Filter: Earnings/FOMC/NFP → Veto oder Konfidenz senken
+3. TERTIÄR – Sentiment: Fear & Greed Extreme als Kontraindikator (±5-10%)
 
 Du gibst genau 2 Signale aus:
 1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
@@ -121,7 +124,7 @@ function getSystemPrompt(dayType: TradingDayType): string {
   return SYSTEM_PROMPT_WEEKDAY;
 }
 
-function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType): string {
+function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string): string {
   const tradingHours = dayType === "weekend"
     ? `Handelszeiten (deutsche Zeit):
 - Krypto: 24/7 – einziger handelbarer Markt am Wochenende`
@@ -153,10 +156,14 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`;
   const exampleMarket = dayType === "weekend" ? "Krypto" : "XETRA";
   const exampleCategory = dayType === "weekend" ? "Krypto" : "Index";
 
+  const contextBlock = marketContext
+    ? `\n${marketContext}\n`
+    : "";
+
   return `Datum: ${date}
 
 ${tradingHours}
-
+${contextBlock}
 Marktdaten:
 
 ${marketData}
@@ -239,8 +246,22 @@ export async function generateSignals(): Promise<{
 
   console.log(`Modus: ${modeLabel}`);
 
-  // 1. Marktdaten laden
-  const marketData = await fetchMarketDataForDayType(dayType);
+  // 1. Marktdaten + Kontext parallel laden
+  const [marketData, marketContext] = await Promise.all([
+    fetchMarketDataForDayType(dayType),
+    fetchMarketContext(),
+  ]);
+
+  // Kontext loggen
+  if (marketContext.fearGreed) {
+    console.log(`Fear & Greed: ${marketContext.fearGreed.value} (${marketContext.fearGreed.classification})`);
+  }
+  if (marketContext.earnings.length > 0) {
+    console.log(`Earnings diese Woche: ${marketContext.earnings.map(e => e.name).join(", ")}`);
+  }
+  if (marketContext.economicEvents.length > 0) {
+    console.log(`High-Impact Events heute: ${marketContext.economicEvents.map(e => e.title).join(", ")}`);
+  }
 
   const minAssets = dayType === "weekend" ? 3 : 5;
   if (marketData.length < minAssets) {
@@ -262,6 +283,7 @@ export async function generateSignals(): Promise<{
   });
 
   const formattedData = formatMarketDataForPrompt(marketData);
+  const formattedContext = formatMarketContextForPrompt(marketContext);
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -270,7 +292,7 @@ export async function generateSignals(): Promise<{
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today, dayType),
+        content: buildUserPrompt(formattedData, today, dayType, formattedContext),
       },
     ],
   });
