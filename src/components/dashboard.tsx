@@ -83,7 +83,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            Trades
+            History
           </button>
         </div>
       </div>
