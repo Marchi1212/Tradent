@@ -58,7 +58,7 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
               onChange={(e) => setName(e.target.value)}
               placeholder="z.B. Test Mai"
               required
-              className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-text-muted"
+              className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-base sm:text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-text-muted"
             />
           </div>
 
@@ -72,7 +72,7 @@ export default function CreatePortfolio({ onCreated, onCancel }: Props) {
                 placeholder="200"
                 required
                 min="1"
-                className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-text-muted pr-10"
+                className="w-full rounded-[12px] bg-bg-secondary border border-border px-4 py-3.5 text-base sm:text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-text-muted pr-10"
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-text-muted">€</span>
             </div>
