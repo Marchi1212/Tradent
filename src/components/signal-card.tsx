@@ -137,7 +137,9 @@ export default function SignalCard({
   }, [signal.market, positionOpened]);
 
   const isBold = signal.riskClass === "bold";
-  const hasPortfolio = portfolio !== null && allocatedBudget > 0;
+  // Bei offener Position: echtes Trade-Budget verwenden, nicht Kelly-Allokation
+  const effectiveBudget = positionOpened && openTrade ? openTrade.budget : allocatedBudget;
+  const hasPortfolio = portfolio !== null && effectiveBudget > 0;
 
   // Berechnungen basierend auf Kelly-Allokation vom Dashboard
   const leverage = parseFloat(signal.leverage);
@@ -158,10 +160,10 @@ export default function SignalCard({
   const slPercent = slPctRaw * leverage + spreadCostPct;
 
   const expectedGainEuro = hasPortfolio
-    ? (allocatedBudget * tpPercent / 100).toFixed(2)
+    ? (effectiveBudget * tpPercent / 100).toFixed(2)
     : "0";
   const maxLossEuro = hasPortfolio
-    ? (allocatedBudget * slPercent / 100).toFixed(2)
+    ? (effectiveBudget * slPercent / 100).toFixed(2)
     : "0";
 
   // Beispielrechnung ohne Portfolio (200€ Beispiel)
@@ -170,7 +172,7 @@ export default function SignalCard({
 
   // Schritt 1: Revalidierung starten
   async function handleRevalidate() {
-    if (!portfolio || allocatedBudget <= 0) return;
+    if (!portfolio || effectiveBudget <= 0) return;
     try {
       setRevalidating(true);
       setRevalError(null);
@@ -210,7 +212,7 @@ export default function SignalCard({
 
   // Schritt 2: Trade mit aktualisierten Werten bestätigen
   async function handleConfirmPosition() {
-    if (!portfolio || allocatedBudget <= 0 || !revalidation) return;
+    if (!portfolio || effectiveBudget <= 0 || !revalidation) return;
     try {
       const { addTrade } = await import("@/lib/portfolio-store");
       const trade = await addTrade({
@@ -222,7 +224,7 @@ export default function SignalCard({
         stopLoss: revalidation.stopLoss,
         takeProfit: revalidation.takeProfit,
         leverage: signal.leverage,
-        budget: allocatedBudget,
+        budget: effectiveBudget,
         status: "open",
       });
       setOpenTrade(trade);
@@ -394,7 +396,7 @@ export default function SignalCard({
               {" · "}
               {hasPortfolio ? (
                 <>
-                  +{expectedGainEuro}€ bei {allocatedBudget}€
+                  +{expectedGainEuro}€ bei {effectiveBudget}€
                 </>
               ) : (
                 <>
@@ -459,7 +461,7 @@ export default function SignalCard({
             <div className={`pt-4 border-t ${c.border} space-y-1`}>
               <div className="flex justify-between text-sm">
                 <span className={c.textSec}>Einsatz (Kelly)</span>
-                <span className={`font-bold ${c.text}`}>{allocatedBudget}€</span>
+                <span className={`font-bold ${c.text}`}>{effectiveBudget}€</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className={c.textSec}>Max. Verlust</span>
@@ -525,7 +527,7 @@ export default function SignalCard({
                     <>
                       <div className="flex items-center justify-between">
                         <span className={`text-sm font-bold ${c.text}`}>Position aktiv</span>
-                        <span className={`text-sm ${c.textSec}`}>{openTrade?.budget || allocatedBudget}€</span>
+                        <span className={`text-sm ${c.textSec}`}>{effectiveBudget}€</span>
                       </div>
                       <button
                         onClick={handleClosePosition}
@@ -579,7 +581,7 @@ export default function SignalCard({
                           onClick={handleConfirmPosition}
                           className={`flex-1 rounded-[6px] ${c.btnBg} py-3 text-sm font-bold ${c.btnText} transition-colors ${c.btnHover}`}
                         >
-                          Bestätigen · {allocatedBudget}€
+                          Bestätigen · {effectiveBudget}€
                         </button>
                         <button
                           onClick={handleCancelRevalidation}
@@ -638,7 +640,7 @@ export default function SignalCard({
                     }`}
                   >
                     {marketInfo.isOpen
-                      ? `Position eröffnen · ${allocatedBudget}€`
+                      ? `Position eröffnen · ${effectiveBudget}€`
                       : "Markt geschlossen"}
                   </button>
                 </div>
