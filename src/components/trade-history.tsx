@@ -202,8 +202,30 @@ function AllSignals() {
     byDate.get(dateStr)!.push(s);
   }
 
+  const evaluated = signals.filter((s) => s.outcome !== null);
+  const tpCount = signals.filter((s) => s.outcome === "tp").length;
+  const slCount = signals.filter((s) => s.outcome === "sl").length;
+
   return (
     <div className="space-y-5">
+      {/* Zusammenfassung */}
+      <div className="rounded-[12px] bg-bg-secondary p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] text-text-muted uppercase">Trefferquote</p>
+            <p className={`text-xl font-black mt-1 ${evaluated.length > 0 ? (tpCount >= slCount ? "text-positive" : "text-negative") : "text-text-muted"}`}>
+              {evaluated.length > 0 ? `${Math.round((tpCount / evaluated.length) * 100)}%` : "–"}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] text-text-muted uppercase">Signale</p>
+            <p className="text-sm font-bold text-text-primary mt-1">
+              {signals.length} gesamt{evaluated.length > 0 ? ` · ${tpCount} TP · ${slCount} SL` : ""}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {Array.from(byDate.entries()).map(([date, daySignals]) => (
         <div key={date}>
           <p className="text-[11px] text-text-muted uppercase font-semibold mb-3">{date}</p>
