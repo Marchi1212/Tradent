@@ -27,6 +27,64 @@ export async function GET(request: Request) {
     const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
 
+    // ── Täglicher Morgen-Reminder (09:15 CET) ──
+    // Cron läuft alle 10 Min → zwischen 09:10 und 09:20 CET triggern
+    const cetNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+    const cetHour = cetNow.getHours();
+    const cetMin = cetNow.getMinutes();
+    const isMorningWindow = cetHour === 9 && cetMin >= 10 && cetMin < 20;
+
+    if (isMorningWindow) {
+      // Alle User mit Push-Subscription holen
+      const { data: allSubs } = await supabase
+        .from("push_subscriptions")
+        .select("user_id, subscription");
+
+      if (allSubs && allSubs.length > 0) {
+        // Prüfen ob heute schon ein Morgen-Reminder gesendet wurde
+        const todayStart = new Date(cetNow);
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: alreadySent } = await supabase
+          .from("push_queue")
+          .select("id")
+          .eq("signal_id", "daily-morning")
+          .gte("fire_at", todayStart.toISOString())
+          .limit(1);
+
+        if (!alreadySent || alreadySent.length === 0) {
+          for (const sub of allSubs) {
+            if (!sub.subscription) continue;
+            try {
+              const payload = JSON.stringify({
+                title: "Neue Signale verfügbar",
+                body: "Deine täglichen Trading-Signale sind bereit. Jetzt prüfen.",
+                tag: "daily-morning",
+              });
+              await webPush.sendNotification(sub.subscription, payload);
+            } catch (err) {
+              const pushErr = err as { statusCode?: number };
+              if (pushErr.statusCode === 410) {
+                await supabase
+                  .from("push_subscriptions")
+                  .delete()
+                  .eq("user_id", sub.user_id);
+              }
+            }
+          }
+          // Marker setzen damit nicht doppelt gesendet wird
+          await supabase.from("push_queue").insert({
+            user_id: allSubs[0].user_id,
+            signal_id: "daily-morning",
+            title: "Morgen-Reminder",
+            body: "gesendet",
+            fire_at: new Date().toISOString(),
+            sent: true,
+          });
+        }
+      }
+    }
+
+    // ── Fällige Queue-Notifications senden ──
     // Fällige Notifications holen (fire_at <= jetzt UND noch nicht gesendet)
     const now = new Date().toISOString();
     const { data: queue, error: queueError } = await supabase
