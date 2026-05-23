@@ -579,39 +579,39 @@ export default function SignalCard({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Einstieg</p>
-                  <p className={`text-base font-bold ${c.text} mt-1`}>{(openTrade?.entry || signal.entry).toLocaleString("de-DE")}</p>
+                  <p className={`text-base font-bold ${c.text} mt-0.5`}>{(openTrade?.entry || signal.entry).toLocaleString("de-DE")}</p>
                 </div>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Ausstieg</p>
-                  <p className={`text-base font-bold ${c.text} mt-1`}>{closeResult?.exitPrice ? closeResult.exitPrice.toLocaleString("de-DE") : "–"}</p>
+                  <p className={`text-base font-bold ${c.text} mt-0.5`}>{closeResult?.exitPrice ? closeResult.exitPrice.toLocaleString("de-DE") : "–"}</p>
                 </div>
               </div>
 
               {/* Einsatz → Endwert */}
-              <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${c.border}`}>
+              <div className={`grid grid-cols-2 gap-3 py-3 border-t ${c.border}`}>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Einsatz</p>
-                  <p className={`text-base font-bold ${c.text} mt-1`}>{effectiveBudget}€</p>
+                  <p className={`text-base font-bold ${c.text} mt-0.5`}>{effectiveBudget}€</p>
                 </div>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Endwert</p>
-                  <p className={`text-base font-bold ${closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400"} mt-1`}>
+                  <p className={`text-base font-bold ${closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400"} mt-0.5`}>
                     {closeResult ? (effectiveBudget + closeResult.pnl).toFixed(2) : effectiveBudget}€
                   </p>
                 </div>
               </div>
 
               {/* Zeitstempel */}
-              <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${c.border}`}>
+              <div className={`grid grid-cols-2 gap-3 pt-3 border-t ${c.border}`}>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Eröffnet</p>
-                  <p className={`text-sm font-semibold ${c.text} mt-1`}>
+                  <p className={`text-sm font-semibold ${c.text} mt-0.5`}>
                     {openTrade ? new Date(openTrade.openedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–"}
                   </p>
                 </div>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Geschlossen</p>
-                  <p className={`text-sm font-semibold ${c.text} mt-1`}>
+                  <p className={`text-sm font-semibold ${c.text} mt-0.5`}>
                     {openTrade?.closedAt ? new Date(openTrade.closedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–"}
                   </p>
                 </div>

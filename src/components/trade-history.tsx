@@ -235,44 +235,44 @@ function TradeRow({ trade }: { trade: Trade }) {
 
       {/* Expanded Details */}
       {expanded && isClosed && (
-        <div className="px-4 pb-4 space-y-3 border-t border-white/10 pt-3">
+        <div className="px-4 pb-3 border-t border-white/10 pt-3">
           {/* Entry → Exit */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 pb-3">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Einstieg</p>
-              <p className="text-sm font-bold text-white mt-1">{trade.entry.toLocaleString("de-DE")}</p>
+              <p className="text-sm font-bold text-white mt-0.5">{trade.entry.toLocaleString("de-DE")}</p>
             </div>
             <div>
               <p className="text-[13px] text-white/55 uppercase">Ausstieg</p>
-              <p className="text-sm font-bold text-white mt-1">{trade.exitPrice ? trade.exitPrice.toLocaleString("de-DE") : "–"}</p>
+              <p className="text-sm font-bold text-white mt-0.5">{trade.exitPrice ? trade.exitPrice.toLocaleString("de-DE") : "–"}</p>
             </div>
           </div>
 
           {/* Einsatz → Endwert */}
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-3 py-3 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Einsatz</p>
-              <p className="text-sm font-bold text-white mt-1">{trade.budget.toFixed(0)}€</p>
+              <p className="text-sm font-bold text-white mt-0.5">{trade.budget.toFixed(0)}€</p>
             </div>
             <div>
               <p className="text-[13px] text-white/55 uppercase">Endwert</p>
-              <p className={`text-sm font-bold mt-1 ${isPositive ? "text-green-400" : "text-red-400"}`}>
+              <p className={`text-sm font-bold mt-0.5 ${isPositive ? "text-green-400" : "text-red-400"}`}>
                 {endValue.toFixed(2)}€
               </p>
             </div>
           </div>
 
           {/* P&L */}
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-3 py-3 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Ergebnis</p>
-              <p className={`text-sm font-bold mt-1 ${isPositive ? "text-green-400" : "text-red-400"}`}>
+              <p className={`text-sm font-bold mt-0.5 ${isPositive ? "text-green-400" : "text-red-400"}`}>
                 {isPositive ? "+" : ""}{pnl.toFixed(2)}€
               </p>
             </div>
             <div>
               <p className="text-[13px] text-white/55 uppercase">Rendite</p>
-              <p className={`text-sm font-bold mt-1 ${isPositive ? "text-green-400" : "text-red-400"}`}>
+              <p className={`text-sm font-bold mt-0.5 ${isPositive ? "text-green-400" : "text-red-400"}`}>
                 {pnlPercent >= 0 ? "+" : ""}{pnlPercent.toFixed(1)}%
               </p>
             </div>
@@ -282,11 +282,11 @@ function TradeRow({ trade }: { trade: Trade }) {
           <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Eröffnet</p>
-              <p className="text-sm font-semibold text-white mt-1">{openDate}</p>
+              <p className="text-sm font-semibold text-white mt-0.5">{openDate}</p>
             </div>
             <div>
               <p className="text-[13px] text-white/55 uppercase">Geschlossen</p>
-              <p className="text-sm font-semibold text-white mt-1">{closeDate}</p>
+              <p className="text-sm font-semibold text-white mt-0.5">{closeDate}</p>
             </div>
           </div>
         </div>
