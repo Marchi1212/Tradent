@@ -588,7 +588,7 @@ export default function SignalCard({
               </div>
 
               {/* Einsatz → Endwert */}
-              <div className={`grid grid-cols-2 gap-3 py-3 border-t ${c.border}`}>
+              <div className={`grid grid-cols-2 gap-3 py-2 border-t ${c.border}`}>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Einsatz</p>
                   <p className={`text-base font-bold ${c.text} mt-0.5`}>{effectiveBudget}€</p>
@@ -602,7 +602,7 @@ export default function SignalCard({
               </div>
 
               {/* Zeitstempel */}
-              <div className={`grid grid-cols-2 gap-3 pt-3 border-t ${c.border}`}>
+              <div className={`grid grid-cols-2 gap-3 pt-2 border-t ${c.border}`}>
                 <div>
                   <p className={`text-[13px] ${c.textMut} uppercase`}>Eröffnet</p>
                   <p className={`text-sm font-semibold ${c.text} mt-0.5`}>

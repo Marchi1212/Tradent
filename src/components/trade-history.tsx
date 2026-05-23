@@ -235,9 +235,9 @@ function TradeRow({ trade }: { trade: Trade }) {
 
       {/* Expanded Details */}
       {expanded && isClosed && (
-        <div className="px-4 pb-3 border-t border-white/10 pt-3">
+        <div className="px-4 pb-2 border-t border-white/10 pt-3">
           {/* Entry → Exit */}
-          <div className="grid grid-cols-2 gap-3 pb-3">
+          <div className="grid grid-cols-2 gap-3 pb-2">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Einstieg</p>
               <p className="text-sm font-bold text-white mt-0.5">{trade.entry.toLocaleString("de-DE")}</p>
@@ -249,7 +249,7 @@ function TradeRow({ trade }: { trade: Trade }) {
           </div>
 
           {/* Einsatz → Endwert */}
-          <div className="grid grid-cols-2 gap-3 py-3 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-3 py-2 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Einsatz</p>
               <p className="text-sm font-bold text-white mt-0.5">{trade.budget.toFixed(0)}€</p>
@@ -263,7 +263,7 @@ function TradeRow({ trade }: { trade: Trade }) {
           </div>
 
           {/* P&L */}
-          <div className="grid grid-cols-2 gap-3 py-3 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-3 py-2 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Ergebnis</p>
               <p className={`text-sm font-bold mt-0.5 ${isPositive ? "text-green-400" : "text-red-400"}`}>
@@ -279,7 +279,7 @@ function TradeRow({ trade }: { trade: Trade }) {
           </div>
 
           {/* Zeitstempel */}
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Eröffnet</p>
               <p className="text-sm font-semibold text-white mt-0.5">{openDate}</p>
