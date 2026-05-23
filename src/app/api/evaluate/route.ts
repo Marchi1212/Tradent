@@ -115,9 +115,7 @@ export async function GET(request: Request) {
     // Cron-Schutz: nur Vercel Cron oder mit CRON_SECRET erlaubt
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    const { searchParams: _sp } = new URL(request.url);
-    const _bypass = _sp.get("run") === "eval-now-0524";
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && !_bypass) {
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
