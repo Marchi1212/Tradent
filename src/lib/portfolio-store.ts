@@ -256,6 +256,21 @@ export async function getOpenTradeForSignal(portfolioId: string, signalId: strin
   return data ? toTrade(data) : null;
 }
 
+export async function getTradeForSignal(portfolioId: string, signalId: string): Promise<Trade | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("trades")
+    .select("*")
+    .eq("portfolio_id", portfolioId)
+    .eq("signal_id", signalId)
+    .order("opened_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? toTrade(data) : null;
+}
+
 export async function closeTrade(
   tradeId: string,
   exitPrice: number,

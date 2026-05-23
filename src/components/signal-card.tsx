@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
 import type { Portfolio } from "@/lib/portfolio-store";
-import { getOpenTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
+import { getOpenTradeForSignal, getTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 
 function ClockIcon({ className }: { className?: string }) {
@@ -89,14 +89,25 @@ export default function SignalCard({
   } | null>(null);
   const [positionClosed, setPositionClosed] = useState(false);
 
-  // Prüfen ob schon ein offener Trade für dieses Signal existiert
+  // Prüfen ob schon ein Trade für dieses Signal existiert (offen oder geschlossen)
   useEffect(() => {
     if (!portfolio) return;
-    getOpenTradeForSignal(portfolio.id, signal.id)
+    getTradeForSignal(portfolio.id, signal.id)
       .then((trade) => {
         if (trade) {
-          setPositionOpened(true);
-          setOpenTrade(trade);
+          if (trade.status === "open") {
+            setPositionOpened(true);
+            setOpenTrade(trade);
+          } else {
+            setPositionClosed(true);
+            if (trade.result != null) {
+              setCloseResult({
+                exitPrice: 0,
+                pnl: trade.result,
+                pnlPercent: trade.budget > 0 ? Math.round((trade.result / trade.budget) * 100 * 100) / 100 : 0,
+              });
+            }
+          }
         }
       })
       .catch(console.error);
@@ -298,21 +309,43 @@ export default function SignalCard({
         onClick={() => setExpanded(!expanded)}
         className="w-full px-5 py-4 text-left"
       >
-        {/* Zeile 1: Direction/Category/Leverage + Timer */}
+        {/* Zeile 1: Direction/Category/Leverage + Status */}
         <div className="flex items-center justify-between mb-1">
           <p className={`text-sm font-bold ${c.text}`}>
             {signal.direction} · {signal.category} · {signal.leverage}
           </p>
-          {!positionOpened && (
-            <div className="flex items-center gap-1.5">
-              <ClockIcon className={`w-3.5 h-3.5 ${c.timerText}`} />
-              <span className={`text-[13px] font-medium ${c.timerText}`}>
-                {marketInfo.timerSeconds !== null
-                  ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
-                  : marketInfo.timerLabel}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              positionClosed
+                ? (closeResult && closeResult.pnl >= 0 ? "bg-green-400" : "bg-red-400")
+                : positionOpened
+                  ? "bg-amber-400"
+                  : marketInfo.marketPhase === "post_close"
+                    ? "bg-white/30"
+                    : marketInfo.marketPhase === "open"
+                      ? "bg-green-400"
+                      : marketInfo.marketPhase === "closing_soon"
+                        ? "bg-amber-400"
+                        : "bg-blue-400"
+            }`} />
+            <span className={`text-[13px] font-medium ${
+              positionClosed
+                ? (closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400")
+                : positionOpened
+                  ? "text-amber-400"
+                  : c.timerText
+            }`}>
+              {positionClosed
+                ? (closeResult ? `${closeResult.pnl >= 0 ? "+" : ""}${closeResult.pnl}€` : "Abgeschlossen")
+                : positionOpened
+                  ? "Position läuft"
+                  : marketInfo.marketPhase === "post_close"
+                    ? "Abgelaufen"
+                    : marketInfo.timerSeconds !== null
+                      ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
+                      : marketInfo.timerLabel}
+            </span>
+          </div>
         </div>
 
         {/* Zeile 2: Asset + Confidence auf gleicher Baseline */}
@@ -366,17 +399,28 @@ export default function SignalCard({
             <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
           </div>
 
-          {/* Timing */}
-          <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${c.border}`}>
-            <div>
-              <p className={`text-[13px] ${c.textMut} uppercase`}>Bester Einstieg</p>
-              <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.optimalEntry}</p>
-            </div>
-            <div>
-              <p className={`text-[13px] ${c.textMut} uppercase`}>Markt schließt</p>
-              <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.marketCloseTime}</p>
-            </div>
-          </div>
+          {/* Timing – Bester Einstieg nur vor Position, Markt schließt nicht bei Krypto */}
+          {(() => {
+            const showEntry = !positionOpened && !positionClosed;
+            const showClose = signal.market !== "Krypto";
+            if (!showEntry && !showClose) return null;
+            return (
+              <div className={`grid ${showEntry && showClose ? "grid-cols-2" : "grid-cols-1"} gap-3 pt-4 border-t ${c.border}`}>
+                {showEntry && (
+                  <div>
+                    <p className={`text-[13px] ${c.textMut} uppercase`}>Bester Einstieg</p>
+                    <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.optimalEntry}</p>
+                  </div>
+                )}
+                {showClose && (
+                  <div>
+                    <p className={`text-[13px] ${c.textMut} uppercase`}>Markt schließt</p>
+                    <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.marketCloseTime}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Reasoning */}
           <div className={`pt-4 border-t ${c.border}`}>

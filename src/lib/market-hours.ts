@@ -107,6 +107,7 @@ export function getMarketInfo(market: string) {
       timerSeconds: null,
       closeSeconds: null,
       totalTradingSeconds,
+      marketPhase: "open" as const,
     };
   }
 
@@ -120,8 +121,9 @@ export function getMarketInfo(market: string) {
 
   if (!isOpen) {
     // Markt geschlossen → Timer bis Öffnung
+    const isPreMarket = currentHour < hours.open;
     let hoursUntilOpen: number;
-    if (currentHour < hours.open) {
+    if (isPreMarket) {
       hoursUntilOpen = hours.open - currentHour;
     } else {
       // Nach Schluss → nächster Tag
@@ -136,6 +138,7 @@ export function getMarketInfo(market: string) {
       timerSeconds: totalSeconds,
       closeSeconds: null,
       totalTradingSeconds,
+      marketPhase: isPreMarket ? "premarket" as const : "post_close" as const,
     };
   }
 
@@ -151,6 +154,7 @@ export function getMarketInfo(market: string) {
       timerSeconds: totalSeconds,
       closeSeconds,
       totalTradingSeconds,
+      marketPhase: "closing_soon" as const,
     };
   }
 
@@ -165,6 +169,7 @@ export function getMarketInfo(market: string) {
     timerSeconds: totalSeconds,
     closeSeconds,
     totalTradingSeconds,
+    marketPhase: "open" as const,
   };
 }
 
