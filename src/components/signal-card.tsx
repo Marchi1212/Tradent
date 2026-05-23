@@ -617,7 +617,7 @@ export default function SignalCard({
           {(hasPortfolio || positionOpened) && (
             <div className={`pt-4 border-t ${c.border} space-y-1`}>
               <div className="flex justify-between text-sm">
-                <span className={c.textSec}>Einsatz (Kelly)</span>
+                <span className={c.textSec}>Einsatz</span>
                 <span className={`font-bold ${c.text}`}>{effectiveBudget}€</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -625,7 +625,7 @@ export default function SignalCard({
                 <span className={`font-bold ${c.text}`}>-{maxLossEuro}€</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className={c.textSec}>Erwarteter Gewinn</span>
+                <span className={c.textSec}>Max. Gewinn</span>
                 <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
               </div>
             </div>
