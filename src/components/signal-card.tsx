@@ -121,6 +121,13 @@ export default function SignalCard({
   const [positionClosed, setPositionClosed] = useState(false);
   const [signalInvalid, setSignalInvalid] = useState(false);
 
+  // Live P&L für offene Positionen
+  const [livePnl, setLivePnl] = useState<{
+    currentPrice: number;
+    pnl: number;
+    pnlPercent: number;
+  } | null>(null);
+
   // Prüfen ob schon ein Trade für dieses Signal existiert (offen oder geschlossen)
   useEffect(() => {
     // State resetten wenn Portfolio wechselt oder weg ist
@@ -175,6 +182,20 @@ export default function SignalCard({
         if (!price) return;
 
         const trade = openTrade!;
+        const lev = parseFloat(signal.leverage);
+
+        // Live P&L berechnen (bei jedem Price-Check)
+        const liveDiff = trade.direction === "LONG"
+          ? price - trade.entry
+          : trade.entry - price;
+        const livePnlPct = (liveDiff / trade.entry) * 100 * lev;
+        const livePnlEur = Math.round(trade.budget * (livePnlPct / 100) * 100) / 100;
+        setLivePnl({
+          currentPrice: price,
+          pnl: livePnlEur,
+          pnlPercent: Math.round(livePnlPct * 100) / 100,
+        });
+
         let shouldClose = false;
         let exitPrice = price;
         let reason = "";
@@ -489,23 +510,48 @@ export default function SignalCard({
           <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
         </div>
 
-        {/* Zeile 3: Expected Gain + Chevron */}
+        {/* Zeile 3: Live P&L / Ergebnis / Expected Gain + Chevron */}
         <div className="flex items-center justify-between mt-3">
-          <div className={`${c.gainBg} rounded-[6px] px-3 py-1.5`}>
-            <p className={`text-sm ${c.text}`}>
-              <span className="font-bold">+{tpPercent.toFixed(1)}%</span>
-              {" · "}
-              {hasPortfolio ? (
-                <>
-                  +{expectedGainEuro}€ bei {effectiveBudget}€
-                </>
-              ) : (
-                <>
-                  +{exampleGain}€ bei {exampleBudget}€
-                </>
-              )}
-            </p>
-          </div>
+          {positionOpened && livePnl ? (
+            /* Live P&L bei offener Position */
+            <div className={`${livePnl.pnl >= 0 ? "bg-green-500/15" : "bg-red-500/15"} rounded-[6px] px-3 py-1.5`}>
+              <p className={`text-sm ${livePnl.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <span className="text-white/60">{effectiveBudget}€</span>
+                {" · "}
+                <span className="font-bold">{livePnl.pnlPercent >= 0 ? "+" : ""}{livePnl.pnlPercent.toFixed(1)}%</span>
+                {" · "}
+                <span className="font-bold">{livePnl.pnl >= 0 ? "+" : ""}{livePnl.pnl.toFixed(2)}€</span>
+              </p>
+            </div>
+          ) : positionClosed && closeResult ? (
+            /* Ergebnis bei geschlossener Position */
+            <div className={`${closeResult.pnl >= 0 ? "bg-green-500/15" : "bg-red-500/15"} rounded-[6px] px-3 py-1.5`}>
+              <p className={`text-sm ${closeResult.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <span className="text-white/60">{effectiveBudget}€</span>
+                {" · "}
+                <span className="font-bold">{closeResult.pnlPercent >= 0 ? "+" : ""}{closeResult.pnlPercent.toFixed(1)}%</span>
+                {" · "}
+                <span className="font-bold">{closeResult.pnl >= 0 ? "+" : ""}{closeResult.pnl.toFixed(2)}€</span>
+              </p>
+            </div>
+          ) : (
+            /* Erwarteter Gewinn (Standard) */
+            <div className={`${c.gainBg} rounded-[6px] px-3 py-1.5`}>
+              <p className={`text-sm ${c.text}`}>
+                <span className="font-bold">+{tpPercent.toFixed(1)}%</span>
+                {" · "}
+                {hasPortfolio ? (
+                  <>
+                    +{expectedGainEuro}€ bei {effectiveBudget}€
+                  </>
+                ) : (
+                  <>
+                    +{exampleGain}€ bei {exampleBudget}€
+                  </>
+                )}
+              </p>
+            </div>
+          )}
           <svg
             className={`w-5 h-5 ${c.textMut} transition-transform ${expanded ? "rotate-180" : ""}`}
             fill="none"
