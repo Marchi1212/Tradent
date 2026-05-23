@@ -111,8 +111,10 @@ export default function Dashboard() {
     }
   }, [signals]);
 
+  // Allokation basiert auf Original-Budget (nicht currentBalance),
+  // damit die Aufteilung fix bleibt wenn Position 1 schon offen ist
   const allocations = portfolio && signals
-    ? allocateCapital(portfolio.currentBalance, parseSignalInputs(signals))
+    ? allocateCapital(portfolio.budget, parseSignalInputs(signals))
     : [0, 0];
 
   const invested = portfolio ? Math.max(0, portfolio.budget - portfolio.currentBalance) : 0;

@@ -745,9 +745,9 @@ export default function SignalCard({
                 <div className={`pt-4 border-t ${c.border}`}>
                   <button
                     onClick={handleRevalidate}
-                    disabled={!marketInfo.isOpen || signalInvalid}
+                    disabled={!marketInfo.isOpen || signalInvalid || effectiveBudget <= 0}
                     className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${
-                      signalInvalid
+                      signalInvalid || effectiveBudget <= 0
                         ? "bg-white/10 text-white/30 cursor-not-allowed"
                         : marketInfo.isOpen
                           ? `${c.btnBg} ${c.btnText} ${c.btnHover}`
@@ -756,9 +756,11 @@ export default function SignalCard({
                   >
                     {signalInvalid
                       ? "Signal ungültig"
-                      : marketInfo.isOpen
-                        ? `Position eröffnen · ${effectiveBudget}€`
-                        : "Markt geschlossen"}
+                      : effectiveBudget <= 0
+                        ? "Nicht genug Budget"
+                        : marketInfo.isOpen
+                          ? `Position eröffnen · ${effectiveBudget}€`
+                          : "Markt geschlossen"}
                   </button>
                 </div>
               )}

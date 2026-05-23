@@ -207,9 +207,22 @@ export async function updatePortfolio(
   if (error) throw error;
 }
 
-// Kelly Criterion: optimale Positionsgroeße fuer maximale Portfolio-Performance
-// Half Kelly (fraction=0.5) als Standard: 75% des Wachstums, deutlich weniger Risiko
+// ── Kelly Criterion + Barbell-Strategie ──────────────────────────
+//
+// Akademische Grundlage:
+// - Half Kelly (fraction=0.5): 75% des Wachstums, 50% weniger Varianz
+// - Simultane Bets: Einsätze proportional zum Kelly-Edge, nicht unabhängig
+// - Barbell: Steady (sicher) dominiert, Bold (riskant) bekommt Minimum
+//
+// Regeln:
+// 1. Mindest-Allokation: Jedes Signal bekommt min. 20% des Budgets
+// 2. Exposure-Cap: Max. 90% des Budgets werden eingesetzt, 10% Reserve
+// 3. Aufteilung nach Kelly-Edge (proportional), nicht 50/50
+// 4. Allokation wird einmal berechnet und bleibt fix (kein Recalc nach Trade)
+//
 const KELLY_FRACTION = 0.5;
+const MIN_ALLOCATION_PERCENT = 0.20;  // Mindestens 20% pro Signal
+const MAX_EXPOSURE_PERCENT = 0.90;    // Max 90% des Budgets einsetzen
 
 interface SignalInput {
   confidence: number;       // 0-100
@@ -231,30 +244,37 @@ function rawPositionSize(balance: number, kellyPct: number, slPercent: number, l
 }
 
 // Berechnet optimale Aufteilung des Kapitals auf mehrere Signale
+// Verwendet das ORIGINAL-Budget (nicht den aktuellen Balance nach Trades)
 export function allocateCapital(
-  balance: number,
+  budget: number,
   signals: SignalInput[]
 ): number[] {
   if (signals.length === 0) return [];
 
-  // Kelly-Gewichtung pro Signal
+  const maxExposure = budget * MAX_EXPOSURE_PERCENT;
+  const minPerSignal = budget * MIN_ALLOCATION_PERCENT;
+
+  // Kelly-Edge pro Signal berechnen
   const kellys = signals.map(s => kellyPercent(s.confidence, s.riskRewardRatio));
 
-  // Rohe Positionen berechnen
+  // Rohe Positionen berechnen (basierend auf vollem Budget)
   const rawPositions = signals.map((s, i) =>
     kellys[i] > 0
-      ? rawPositionSize(balance, kellys[i], s.stopLossPercent, s.leverage)
+      ? rawPositionSize(budget, kellys[i], s.stopLossPercent, s.leverage)
       : 0
   );
 
-  // Wenn Gesamtsumme > Balance: proportional skalieren
-  const total = rawPositions.reduce((a, b) => a + b, 0);
-  if (total > balance) {
-    const scale = balance / total;
-    return rawPositions.map(p => Math.floor(p * scale));
+  // Mindest-Allokation erzwingen: kein Signal unter 20% des Budgets
+  const positions = rawPositions.map(p => Math.max(p, minPerSignal));
+
+  // Exposure-Cap: Gesamtsumme darf max. 90% des Budgets sein
+  const total = positions.reduce((a, b) => a + b, 0);
+  if (total > maxExposure) {
+    const scale = maxExposure / total;
+    return positions.map(p => Math.floor(p * scale));
   }
 
-  return rawPositions.map(p => Math.floor(p));
+  return positions.map(p => Math.floor(p));
 }
 
 // Einzelne Position (Fallback fuer einzelne Berechnung)
