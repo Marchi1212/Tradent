@@ -62,6 +62,24 @@ const SPREAD_PERCENT: Record<string, number> = {
   Krypto: 0.20,
 };
 
+// XTB Volumen berechnen: Budget × Leverage / Kurs
+// Bei Aktien: Lots = Anzahl Aktien. Bei Indizes/Forex/Krypto: Lots.
+function calculateVolume(budget: number, leverage: number, entry: number, category: string): string {
+  const positionSize = budget * leverage;
+  const lots = positionSize / entry;
+
+  if (category === "Forex") {
+    // Forex: 1 Lot = 100.000 Einheiten, XTB erlaubt Micro-Lots (0.01)
+    const forexLots = lots / 100000;
+    return forexLots < 0.01 ? "0.01" : forexLots.toFixed(2);
+  }
+
+  // Aktien, Indizes, Krypto, Rohstoffe: direkte Lot-Angabe
+  if (lots < 0.01) return "0.01";
+  if (lots >= 1) return lots.toFixed(2);
+  return lots.toFixed(3);
+}
+
 export default function SignalCard({
   signal,
   portfolio,
@@ -142,6 +160,71 @@ export default function SignalCard({
     }, ms);
     return () => clearInterval(interval);
   }, [signal.market, positionOpened]);
+
+  // Auto-Close: alle 60 Sekunden prüfen ob SL/TP erreicht wurde
+  useEffect(() => {
+    if (!positionOpened || !openTrade || positionClosed) return;
+
+    async function checkAutoClose() {
+      try {
+        const res = await fetch(`/api/price?ticker=${encodeURIComponent(signal.ticker)}`);
+        if (!res.ok) return;
+        const { price } = await res.json();
+        if (!price) return;
+
+        const trade = openTrade!;
+        let shouldClose = false;
+        let exitPrice = price;
+        let reason = "";
+
+        if (trade.direction === "LONG") {
+          if (price <= trade.stopLoss) {
+            shouldClose = true;
+            exitPrice = trade.stopLoss;
+            reason = "Stop-Loss erreicht";
+          } else if (price >= trade.takeProfit) {
+            shouldClose = true;
+            exitPrice = trade.takeProfit;
+            reason = "Take-Profit erreicht";
+          }
+        } else {
+          if (price >= trade.stopLoss) {
+            shouldClose = true;
+            exitPrice = trade.stopLoss;
+            reason = "Stop-Loss erreicht";
+          } else if (price <= trade.takeProfit) {
+            shouldClose = true;
+            exitPrice = trade.takeProfit;
+            reason = "Take-Profit erreicht";
+          }
+        }
+
+        if (shouldClose) {
+          const lev = parseFloat(signal.leverage);
+          const priceDiff = trade.direction === "LONG"
+            ? exitPrice - trade.entry
+            : trade.entry - exitPrice;
+          const pnlPct = (priceDiff / trade.entry) * 100 * lev;
+          const pnl = Math.round(trade.budget * (pnlPct / 100) * 100) / 100;
+
+          await closeTrade(trade.id, exitPrice, pnl);
+          setPositionClosed(true);
+          setPositionOpened(false);
+          setCloseResult({ exitPrice, pnl, pnlPercent: Math.round(pnlPct * 100) / 100 });
+          cancelCloseNotification(signal.id);
+          onPortfolioUpdate?.();
+          console.log(`Auto-Close: ${signal.asset} – ${reason} (${pnl >= 0 ? "+" : ""}${pnl}€)`);
+        }
+      } catch {
+        // Stille Fehlerbehandlung – nächster Check in 60s
+      }
+    }
+
+    // Sofort prüfen + dann alle 60 Sekunden
+    checkAutoClose();
+    const interval = setInterval(checkAutoClose, 60000);
+    return () => clearInterval(interval);
+  }, [positionOpened, openTrade, positionClosed, signal.ticker]);
 
   const isBold = signal.riskClass === "bold";
   // Bei offener Position: echtes Trade-Budget verwenden, nicht Kelly-Allokation
@@ -433,12 +516,21 @@ export default function SignalCard({
       {/* Expanded View */}
       {expanded && (
         <div className={`px-5 pb-5 space-y-4 border-t ${c.border} pt-4`}>
-          {/* Entry / SL / TP */}
+          {/* Entry / SL / TP + Volumen */}
           <div className="grid grid-cols-3 gap-3">
             <CopyableValue label="Einstieg" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
             <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
             <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
           </div>
+          {hasPortfolio && (
+            <div className="grid grid-cols-3 gap-3">
+              <CopyableValue
+                label="Volumen (Lots)"
+                value={calculateVolume(effectiveBudget, leverage, signal.entry, signal.category)}
+                displayValue={calculateVolume(effectiveBudget, leverage, signal.entry, signal.category)}
+              />
+            </div>
+          )}
 
           {/* Timing – Bester Einstieg nur vor Position, Markt schließt nicht bei Krypto */}
           {(() => {
