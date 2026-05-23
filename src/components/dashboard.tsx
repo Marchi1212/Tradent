@@ -119,12 +119,6 @@ export default function Dashboard() {
 
   const invested = portfolio ? Math.max(0, portfolio.budget - portfolio.currentBalance) : 0;
 
-  const today = new Date().toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-
   return (
     <>
       {/* Header */}
@@ -207,7 +201,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            Signals
+            Today
           </button>
           <button
             onClick={() => setActiveTab("trades")}
@@ -217,7 +211,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            Journal
+            Trades
           </button>
         </div>
       </div>}
@@ -230,7 +224,6 @@ export default function Dashboard() {
           </div>
         ) : activeTab === "signals" ? (
           <>
-            <p className="text-sm text-text-muted">{today}</p>
             {notifState === "prompt" && (
               <button
                 onClick={async () => {
