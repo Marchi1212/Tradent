@@ -149,9 +149,10 @@ export default function SignalCard({
             queueCloseReminder(signal.id, signal.asset, signal.marketCloseTime);
           } else {
             setPositionClosed(true);
+            setOpenTrade(trade);
             if (trade.result != null) {
               setCloseResult({
-                exitPrice: 0,
+                exitPrice: trade.exitPrice || 0,
                 pnl: trade.result,
                 pnlPercent: trade.budget > 0 ? Math.round((trade.result / trade.budget) * 100 * 100) / 100 : 0,
               });

@@ -26,6 +26,7 @@ export interface Trade {
   budget: number;
   status: "open" | "closed";
   result?: number;
+  exitPrice?: number;
   openedAt: string;
   closedAt?: string;
 }
@@ -58,6 +59,7 @@ function toTrade(row: Record<string, unknown>): Trade {
     budget: Number(row.budget),
     status: row.status as "open" | "closed",
     result: row.result != null ? Number(row.result) : undefined,
+    exitPrice: row.exit_price != null ? Number(row.exit_price) : undefined,
     openedAt: row.opened_at as string,
     closedAt: row.closed_at as string | undefined,
   };
@@ -346,6 +348,7 @@ export async function closeTrade(
     .update({
       status: "closed",
       result,
+      exit_price: exitPrice,
       closed_at: new Date().toISOString(),
     })
     .eq("id", tradeId);

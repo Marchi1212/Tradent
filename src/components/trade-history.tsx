@@ -236,8 +236,20 @@ function TradeRow({ trade }: { trade: Trade }) {
       {/* Expanded Details */}
       {expanded && isClosed && (
         <div className="px-4 pb-4 space-y-3 border-t border-white/10 pt-3">
-          {/* Einsatz → Endwert */}
+          {/* Entry → Exit */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Einstieg</p>
+              <p className="text-sm font-bold text-white mt-1">{trade.entry.toLocaleString("de-DE")}</p>
+            </div>
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Ausstieg</p>
+              <p className="text-sm font-bold text-white mt-1">{trade.exitPrice ? trade.exitPrice.toLocaleString("de-DE") : "–"}</p>
+            </div>
+          </div>
+
+          {/* Einsatz → Endwert */}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
             <div>
               <p className="text-[13px] text-white/55 uppercase">Einsatz</p>
               <p className="text-sm font-bold text-white mt-1">{trade.budget.toFixed(0)}€</p>
