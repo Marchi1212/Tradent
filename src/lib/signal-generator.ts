@@ -57,7 +57,7 @@ Regeln:
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes Zeitfenster mit bester Liquidität (z.B. "09:00–10:00" für EU-Indizes, "15:30–16:30" für US)
+- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität (z.B. "09:00–11:00" für EU-Indizes, "15:30–17:30" für US). MAXIMAL 2 Stunden breit!
 - marketCloseTime = XTB-Handelsschluss (z.B. "22:00" für EU-Index-CFDs, "23:00" für US-Index-CFDs, "17:30" für EU-Aktien, "22:00" für US-Aktien)
 - Begründung auf Deutsch, 2-3 Sätze – erwähne Sentiment/Events wenn relevant
 - Entscheide nach Qualität des Setups UND berücksichtige Marktkontext
@@ -84,7 +84,7 @@ Regeln:
 - LONG und SHORT sind beide möglich
 - Krypto-Volatilität am Wochenende beachten (oft niedriger, aber mit plötzlichen Spikes)
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes Zeitfenster (z.B. "10:00–12:00", "14:00–16:00")
+- optimalEntry = konkretes 2-Stunden-Zeitfenster (z.B. "09:00–11:00", "14:00–16:00"). MAXIMAL 2 Stunden breit, nicht breiter!
 - marketCloseTime = "23:59" (Krypto 24/7, aber Trade soll am selben Tag geschlossen werden)
 - Begründung auf Deutsch, 2-3 Sätze
 - Performance first – analysiere jedes Asset sorgfältig
@@ -111,7 +111,7 @@ Regeln:
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes Zeitfenster mit bester Liquidität
+- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität (z.B. "15:30–17:30"). MAXIMAL 2 Stunden breit!
 - marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
 - Begründung auf Deutsch, 2-3 Sätze
 - Performance first
