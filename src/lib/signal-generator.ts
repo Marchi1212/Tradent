@@ -325,5 +325,103 @@ export async function generateSignals(): Promise<{
     `Signale generiert: ${parsed.steady.asset} (Steady, ${parsed.steady.market}) + ${parsed.bold.asset} (Bold, ${parsed.bold.market})`
   );
 
+  // 5. Perplexity Gegencheck (optional – nur wenn API Key vorhanden)
+  if (process.env.PERPLEXITY_API_KEY) {
+    console.log("Perplexity Gegencheck wird durchgeführt...");
+    const [steadyCheck, boldCheck] = await Promise.all([
+      perplexityCheck(parsed.steady),
+      perplexityCheck(parsed.bold),
+    ]);
+
+    if (steadyCheck) {
+      if (!steadyCheck.approved) {
+        console.log(`Perplexity WARNUNG (Steady): ${steadyCheck.reason}`);
+        parsed.steady.confidence = Math.max(40, parsed.steady.confidence - steadyCheck.confidenceReduction);
+        parsed.steady.reasoning += ` ⚠️ ${steadyCheck.reason}`;
+      } else {
+        console.log(`Perplexity OK (Steady): ${steadyCheck.reason}`);
+      }
+    }
+
+    if (boldCheck) {
+      if (!boldCheck.approved) {
+        console.log(`Perplexity WARNUNG (Bold): ${boldCheck.reason}`);
+        parsed.bold.confidence = Math.max(40, parsed.bold.confidence - boldCheck.confidenceReduction);
+        parsed.bold.reasoning += ` ⚠️ ${boldCheck.reason}`;
+      } else {
+        console.log(`Perplexity OK (Bold): ${boldCheck.reason}`);
+      }
+    }
+  }
+
   return parsed;
+}
+
+// ── Perplexity News-Gegencheck ──────────────────
+
+interface PerplexityResult {
+  approved: boolean;
+  confidenceReduction: number;
+  reason: string;
+}
+
+async function perplexityCheck(signal: GeneratedSignal): Promise<PerplexityResult | null> {
+  try {
+    const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [
+          {
+            role: "system",
+            content: `Du bist ein Finanz-News-Analyst. Prüfe ob es aktuelle Nachrichten gibt die einen geplanten Trade gefährden könnten. Suche nach: Gewinnwarnungen, regulatorische Probleme, geopolitische Risiken, unerwartete Ereignisse.
+
+Antworte NUR mit JSON:
+{
+  "approved": true/false,
+  "confidenceReduction": 0-30,
+  "reason": "Kurze Begründung auf Deutsch"
+}
+
+approved=true wenn keine negativen News gefunden.
+approved=false + confidenceReduction wenn Risiken bestehen (10=leicht, 20=mittel, 30=schwer).`,
+          },
+          {
+            role: "user",
+            content: `Prüfe diesen Trade auf aktuelle Risiken:
+- Asset: ${signal.asset} (${signal.ticker})
+- Richtung: ${signal.direction}
+- Kategorie: ${signal.category}
+- Markt: ${signal.market}
+
+Gibt es heute aktuelle Nachrichten die diesen ${signal.direction}-Trade auf ${signal.asset} gefährden könnten?`,
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      console.error(`Perplexity API Fehler: ${res.status}`);
+      return null;
+    }
+
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) return null;
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    return JSON.parse(jsonMatch[0]) as PerplexityResult;
+  } catch (err) {
+    console.error("Perplexity Check fehlgeschlagen:", err);
+    return null; // Bei Fehler einfach weitermachen ohne Check
+  }
 }
