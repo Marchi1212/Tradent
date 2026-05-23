@@ -100,6 +100,7 @@ export default function SignalCard({
     pnlPercent: number;
   } | null>(null);
   const [positionClosed, setPositionClosed] = useState(false);
+  const [signalInvalid, setSignalInvalid] = useState(false);
 
   // Prüfen ob schon ein Trade für dieses Signal existiert (offen oder geschlossen)
   useEffect(() => {
@@ -354,30 +355,36 @@ export default function SignalCard({
                 ? (closeResult && closeResult.pnl >= 0 ? "bg-green-400" : "bg-red-400")
                 : positionOpened
                   ? "bg-amber-400"
-                  : marketInfo.marketPhase === "post_close"
-                    ? "bg-white/30"
-                    : marketInfo.marketPhase === "open"
-                      ? "bg-green-400"
-                      : marketInfo.marketPhase === "closing_soon"
-                        ? "bg-amber-400"
-                        : "bg-blue-400"
+                  : signalInvalid
+                    ? "bg-red-400"
+                    : marketInfo.marketPhase === "post_close"
+                      ? "bg-white/30"
+                      : marketInfo.marketPhase === "open"
+                        ? "bg-green-400"
+                        : marketInfo.marketPhase === "closing_soon"
+                          ? "bg-amber-400"
+                          : "bg-blue-400"
             }`} />
             <span className={`text-[13px] font-medium ${
               positionClosed
                 ? (closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400")
                 : positionOpened
                   ? "text-amber-400"
-                  : c.timerText
+                  : signalInvalid
+                    ? "text-red-400"
+                    : c.timerText
             }`}>
               {positionClosed
                 ? (closeResult ? `${closeResult.pnl >= 0 ? "+" : ""}${closeResult.pnl}€` : "Abgeschlossen")
                 : positionOpened
                   ? "Position läuft"
-                  : marketInfo.marketPhase === "post_close"
-                    ? "Abgelaufen"
-                    : marketInfo.timerSeconds !== null
-                      ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
-                      : marketInfo.timerLabel}
+                  : signalInvalid
+                    ? "Signal ungültig"
+                    : marketInfo.marketPhase === "post_close"
+                      ? "Abgelaufen"
+                      : marketInfo.timerSeconds !== null
+                        ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
+                        : marketInfo.timerLabel}
             </span>
           </div>
         </div>
@@ -606,7 +613,10 @@ export default function SignalCard({
                       </div>
                       <p className={`text-[13px] ${c.textSec} leading-relaxed`}>{revalidation.reason}</p>
                       <button
-                        onClick={handleCancelRevalidation}
+                        onClick={() => {
+                          handleCancelRevalidation();
+                          setSignalInvalid(true);
+                        }}
                         className={`w-full rounded-[6px] py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
                       >
                         Verstanden
@@ -638,16 +648,20 @@ export default function SignalCard({
                 <div className={`pt-4 border-t ${c.border}`}>
                   <button
                     onClick={handleRevalidate}
-                    disabled={!marketInfo.isOpen}
+                    disabled={!marketInfo.isOpen || signalInvalid}
                     className={`w-full rounded-[6px] py-3.5 text-sm font-bold transition-colors ${
-                      marketInfo.isOpen
-                        ? `${c.btnBg} ${c.btnText} ${c.btnHover}`
-                        : "bg-white/10 text-white/30 cursor-not-allowed"
+                      signalInvalid
+                        ? "bg-white/10 text-white/30 cursor-not-allowed"
+                        : marketInfo.isOpen
+                          ? `${c.btnBg} ${c.btnText} ${c.btnHover}`
+                          : "bg-white/10 text-white/30 cursor-not-allowed"
                     }`}
                   >
-                    {marketInfo.isOpen
-                      ? `Position eröffnen · ${effectiveBudget}€`
-                      : "Markt geschlossen"}
+                    {signalInvalid
+                      ? "Signal ungültig"
+                      : marketInfo.isOpen
+                        ? `Position eröffnen · ${effectiveBudget}€`
+                        : "Markt geschlossen"}
                   </button>
                 </div>
               )}
