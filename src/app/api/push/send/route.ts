@@ -84,6 +84,53 @@ export async function GET(request: Request) {
       }
     }
 
+    // ── Abendliche Signal-Evaluierung (22:00 CET) ──
+    // Signale des Tages auswerten: Hat der Kurs TP oder SL erreicht?
+    const isEveningWindow = cetHour === 22 && cetMin >= 0 && cetMin < 10;
+
+    if (isEveningWindow) {
+      const todayStart = new Date(cetNow);
+      todayStart.setHours(0, 0, 0, 0);
+      const { data: alreadyEvaluated } = await supabase
+        .from("push_queue")
+        .select("id")
+        .eq("signal_id", "daily-evaluate")
+        .gte("fire_at", todayStart.toISOString())
+        .limit(1);
+
+      if (!alreadyEvaluated || alreadyEvaluated.length === 0) {
+        try {
+          const todayDate = `${cetNow.getFullYear()}-${String(cetNow.getMonth() + 1).padStart(2, "0")}-${String(cetNow.getDate()).padStart(2, "0")}`;
+          const baseUrl = new URL(request.url).origin;
+          const evalRes = await fetch(`${baseUrl}/api/evaluate?date=${todayDate}`, {
+            headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : {},
+            signal: AbortSignal.timeout(50000),
+          });
+          const evalResult = await evalRes.json().catch(() => null);
+          console.log("Signal-Evaluierung:", evalResult);
+        } catch (err) {
+          console.error("Signal-Evaluierung fehlgeschlagen:", err);
+        }
+
+        // Marker setzen (Dedup) – benutze ersten User mit Subscription
+        const { data: anySub } = await supabase
+          .from("push_subscriptions")
+          .select("user_id")
+          .limit(1);
+
+        if (anySub && anySub.length > 0) {
+          await supabase.from("push_queue").insert({
+            user_id: anySub[0].user_id,
+            signal_id: "daily-evaluate",
+            title: "Signal-Evaluierung",
+            body: "evaluiert",
+            fire_at: new Date().toISOString(),
+            sent: true,
+          });
+        }
+      }
+    }
+
     // ── Fällige Queue-Notifications senden ──
     // Fällige Notifications holen (fire_at <= jetzt UND noch nicht gesendet)
     const now = new Date().toISOString();

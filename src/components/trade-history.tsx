@@ -203,8 +203,8 @@ function AllSignals() {
   }
 
   const evaluated = signals.filter((s) => s.outcome !== null);
-  const tpCount = signals.filter((s) => s.outcome === "tp").length;
-  const slCount = signals.filter((s) => s.outcome === "sl").length;
+  const tpCount = signals.filter((s) => s.outcome === "tp_hit").length;
+  const slCount = signals.filter((s) => s.outcome === "sl_hit").length;
 
   return (
     <div className="space-y-5">
@@ -252,8 +252,18 @@ function SignalRow({ signal }: { signal: SignalRecord }) {
   });
 
   const hasOutcome = signal.outcome !== null;
-  const isTP = signal.outcome === "tp";
-  const isSL = signal.outcome === "sl";
+  const isTP = signal.outcome === "tp_hit";
+  const isSL = signal.outcome === "sl_hit";
+  const isPartial = signal.outcome === "partial";
+  const isNeutral = signal.outcome === "neutral";
+
+  function outcomeLabel() {
+    if (isTP) return <span className="text-sm font-bold text-green-400">TP ✓</span>;
+    if (isSL) return <span className="text-sm font-bold text-red-400">SL ✕</span>;
+    if (isPartial) return <span className="text-sm font-bold text-amber-400">Teilgewinn</span>;
+    if (isNeutral) return <span className="text-sm font-bold text-white/50">Neutral</span>;
+    return <span className="text-xs text-white/40">ausstehend</span>;
+  }
 
   return (
     <div className="rounded-[12px] bg-[#1A1A1A] overflow-hidden">
@@ -278,13 +288,7 @@ function SignalRow({ signal }: { signal: SignalRecord }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {hasOutcome ? (
-            <span className={`text-sm font-bold ${isTP ? "text-green-400" : "text-red-400"}`}>
-              {isTP ? "TP ✓" : "SL ✕"}
-            </span>
-          ) : (
-            <span className="text-xs text-white/40">ausstehend</span>
-          )}
+          {outcomeLabel()}
           <svg
             className={`w-4 h-4 text-white/40 transition-transform ${expanded ? "rotate-180" : ""}`}
             fill="none"

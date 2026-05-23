@@ -122,9 +122,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
-    // Server-seitigen Supabase Client verwenden
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
+    // Admin-Client verwenden (Cron hat keine User-Session)
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const supabase = createAdminClient();
 
     // Signale des Tages laden (nur noch nicht evaluierte)
     const { data: signals, error } = await supabase
