@@ -454,8 +454,8 @@ export default function SignalCard({
             <p className={`text-sm ${c.textSec} leading-relaxed`}>{signal.reasoning}</p>
           </div>
 
-          {/* Risk + Budget Info – nur mit Portfolio */}
-          {hasPortfolio && (
+          {/* Risk + Budget Info */}
+          {(hasPortfolio || positionOpened) && (
             <div className={`pt-4 border-t ${c.border} space-y-1`}>
               <div className="flex justify-between text-sm">
                 <span className={c.textSec}>Einsatz (Kelly)</span>
@@ -472,8 +472,8 @@ export default function SignalCard({
             </div>
           )}
 
-          {/* Position eröffnen – nur mit Portfolio */}
-          {hasPortfolio && (
+          {/* Position eröffnen / schließen */}
+          {(hasPortfolio || positionOpened || positionClosed) && (
             <>
               {positionClosed ? (
                 /* ── Position geschlossen ── */
