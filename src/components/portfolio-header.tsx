@@ -91,7 +91,7 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew, onDe
       {/* Edit-Button (Stift-Icon) */}
       <button
         onClick={onEdit}
-        className="p-2 text-text-muted hover:text-text-primary transition-colors"
+        className="p-2 text-text-primary transition-colors"
         title="Depot bearbeiten"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

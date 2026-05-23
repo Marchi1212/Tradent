@@ -409,7 +409,7 @@ export default function SignalCard({
   const c = {
     bg: "bg-[#1A1A1A]",
     text: "text-white",
-    textSec: "text-white/60",
+    textSec: "text-white",
     textMut: "text-white/55",
     border: "border-white/10",
     btnBg: "bg-white",
@@ -516,7 +516,7 @@ export default function SignalCard({
             /* Live P&L bei offener Position */
             <div className={`${livePnl.pnl >= 0 ? "bg-green-500/15" : "bg-red-500/15"} rounded-[6px] px-3 py-1.5`}>
               <p className={`text-sm ${livePnl.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                <span className="text-white/60">{effectiveBudget}€</span>
+                <span className="text-white">{effectiveBudget}€</span>
                 {" · "}
                 <span className="font-bold">{livePnl.pnlPercent >= 0 ? "+" : ""}{livePnl.pnlPercent.toFixed(1)}%</span>
                 {" · "}
@@ -527,7 +527,7 @@ export default function SignalCard({
             /* Ergebnis bei geschlossener Position */
             <div className={`${closeResult.pnl >= 0 ? "bg-green-500/15" : "bg-red-500/15"} rounded-[6px] px-3 py-1.5`}>
               <p className={`text-sm ${closeResult.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                <span className="text-white/60">{effectiveBudget}€</span>
+                <span className="text-white">{effectiveBudget}€</span>
                 {" · "}
                 <span className="font-bold">{closeResult.pnlPercent >= 0 ? "+" : ""}{closeResult.pnlPercent.toFixed(1)}%</span>
                 {" · "}
