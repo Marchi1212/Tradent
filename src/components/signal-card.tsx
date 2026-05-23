@@ -507,7 +507,10 @@ export default function SignalCard({
               <CopyButton value={signal.ticker} />
             </div>
           </div>
-          <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
+          <div className="text-right">
+            <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
+            <p className={`text-[13px] font-medium ${c.text} mt-1`}>Konfidenz</p>
+          </div>
         </div>
 
         {/* Zeile 3: Live P&L / Ergebnis / Expected Gain + Chevron */}
