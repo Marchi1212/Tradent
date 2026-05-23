@@ -363,6 +363,7 @@ export async function closeTrade(
 
 export async function deletePortfolio(id: string): Promise<void> {
   const supabase = createClient();
+  const userId = await getUserId();
 
   // Zuerst alle zugehörigen Trades löschen (keine Geister-Trades)
   const { error: tradesError } = await supabase
@@ -379,6 +380,21 @@ export async function deletePortfolio(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw error;
+
+  // Falls noch andere Portfolios existieren: erstes aktivieren
+  const { data: remaining } = await supabase
+    .from("portfolios")
+    .select("id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (remaining && remaining.length > 0) {
+    await supabase
+      .from("portfolios")
+      .update({ is_active: true })
+      .eq("id", remaining[0].id);
+  }
 }
 
 export async function addTrade(trade: {
