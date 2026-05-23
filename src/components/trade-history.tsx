@@ -81,7 +81,7 @@ export default function TradeHistory({ portfolio }: Props) {
       {subTab === "my-trades" ? (
         <MyTrades trades={trades} />
       ) : (
-        <AllSignals budget={portfolio.budget} />
+        <AllSignals budget={portfolio.budget} portfolioCreatedAt={portfolio.createdAt} />
       )}
     </div>
   );
@@ -200,9 +200,12 @@ function signalToKellyInput(s: SignalRecord) {
   return { confidence: s.confidence, riskRewardRatio: rr, stopLossPercent: slPercent, leverage };
 }
 
-function AllSignals({ budget }: { budget: number }) {
+type TimeRange = "all" | "portfolio";
+
+function AllSignals({ budget, portfolioCreatedAt }: { budget: number; portfolioCreatedAt: string }) {
   const [signals, setSignals] = useState<SignalRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
 
   useEffect(() => {
     const supabase = createClient();
@@ -210,7 +213,7 @@ function AllSignals({ budget }: { budget: number }) {
       .from("signals")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(100)
       .then(({ data }: { data: SignalRecord[] | null }) => {
         setSignals(data || []);
         setLoaded(true);
@@ -234,9 +237,15 @@ function AllSignals({ budget }: { budget: number }) {
     );
   }
 
+  // Nach Zeitraum filtern
+  const portfolioStart = new Date(portfolioCreatedAt);
+  const filteredSignals = timeRange === "portfolio"
+    ? signals.filter((s) => new Date(s.created_at) >= portfolioStart)
+    : signals;
+
   // Nach Datum gruppieren
   const byDate = new Map<string, SignalRecord[]>();
-  for (const s of signals) {
+  for (const s of filteredSignals) {
     const dateStr = new Date(s.created_at).toLocaleDateString("de-DE", {
       day: "numeric",
       month: "short",
@@ -254,15 +263,13 @@ function AllSignals({ budget }: { budget: number }) {
       const allocations = allocateCapital(budget, kellyInputs);
       daySignals.forEach((s, i) => allocationMap.set(s.id, allocations[i] || 0));
     } else {
-      // Einzelnes Signal → einfache Allokation (45% des Budgets)
       daySignals.forEach((s) => allocationMap.set(s.id, Math.floor(budget * 0.45)));
     }
   }
 
   // Theoretisches Gesamtergebnis berechnen
-  const evaluated = signals.filter((s) => s.outcome !== null);
-  const tpCount = signals.filter((s) => s.outcome === "tp_hit").length;
-  const slCount = signals.filter((s) => s.outcome === "sl_hit").length;
+  const evaluated = filteredSignals.filter((s) => s.outcome !== null);
+  const tpCount = filteredSignals.filter((s) => s.outcome === "tp_hit").length;
   let totalTheoreticalPnl = 0;
   for (const s of evaluated) {
     const alloc = allocationMap.get(s.id) || 0;
@@ -272,6 +279,30 @@ function AllSignals({ budget }: { budget: number }) {
 
   return (
     <div className="space-y-5">
+      {/* Zeitraum-Toggle */}
+      <div className="flex rounded-[12px] bg-bg-secondary p-1 gap-1">
+        <button
+          onClick={() => setTimeRange("all")}
+          className={`flex-1 rounded-[6px] py-1.5 text-xs font-semibold text-center transition-colors ${
+            timeRange === "all"
+              ? "bg-bg-primary text-text-primary shadow-sm"
+              : "text-text-muted"
+          }`}
+        >
+          Seit Tradent
+        </button>
+        <button
+          onClick={() => setTimeRange("portfolio")}
+          className={`flex-1 rounded-[6px] py-1.5 text-xs font-semibold text-center transition-colors ${
+            timeRange === "portfolio"
+              ? "bg-bg-primary text-text-primary shadow-sm"
+              : "text-text-muted"
+          }`}
+        >
+          Seit Depot
+        </button>
+      </div>
+
       {/* Zusammenfassung */}
       <div className="rounded-[12px] bg-bg-secondary p-4">
         <div className="flex items-center justify-between">
@@ -285,22 +316,29 @@ function AllSignals({ budget }: { budget: number }) {
             <p className="text-[11px] text-text-muted uppercase">Trefferquote</p>
             <p className="text-sm font-bold text-text-primary mt-1">
               {evaluated.length > 0 ? `${Math.round((tpCount / evaluated.length) * 100)}%` : "–"}
-              <span className="text-text-muted font-normal"> · {signals.length} Signale</span>
+              <span className="text-text-muted font-normal"> · {filteredSignals.length} Signale</span>
             </p>
           </div>
         </div>
       </div>
 
-      {Array.from(byDate.entries()).map(([date, daySignals]) => (
-        <div key={date}>
-          <p className="text-[11px] text-text-muted uppercase font-semibold mb-3">{date}</p>
-          <div className="space-y-2">
-            {daySignals.map((s) => (
-              <SignalRow key={s.id} signal={s} allocatedBudget={allocationMap.get(s.id) || 0} />
-            ))}
-          </div>
+      {filteredSignals.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <p className="text-sm font-semibold text-text-primary">Keine Signale in diesem Zeitraum</p>
+          <p className="text-xs text-text-muted mt-1">Depot eröffnet am {portfolioStart.toLocaleDateString("de-DE")}</p>
         </div>
-      ))}
+      ) : (
+        Array.from(byDate.entries()).map(([date, daySignals]) => (
+          <div key={date}>
+            <p className="text-[11px] text-text-muted uppercase font-semibold mb-3">{date}</p>
+            <div className="space-y-2">
+              {daySignals.map((s) => (
+                <SignalRow key={s.id} signal={s} allocatedBudget={allocationMap.get(s.id) || 0} />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
