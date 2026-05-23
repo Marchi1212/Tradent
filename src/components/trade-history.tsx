@@ -279,42 +279,27 @@ function AllSignals({ budget, portfolioCreatedAt }: { budget: number; portfolioC
 
   return (
     <div className="space-y-5">
-      {/* Zeitraum-Toggle */}
-      <div className="flex rounded-[12px] bg-bg-secondary p-1 gap-1">
-        <button
-          onClick={() => setTimeRange("all")}
-          className={`flex-1 rounded-[6px] py-1.5 text-xs font-semibold text-center transition-colors ${
-            timeRange === "all"
-              ? "bg-bg-primary text-text-primary shadow-sm"
-              : "text-text-muted"
-          }`}
-        >
-          Seit Tradent
-        </button>
-        <button
-          onClick={() => setTimeRange("portfolio")}
-          className={`flex-1 rounded-[6px] py-1.5 text-xs font-semibold text-center transition-colors ${
-            timeRange === "portfolio"
-              ? "bg-bg-primary text-text-primary shadow-sm"
-              : "text-text-muted"
-          }`}
-        >
-          Seit Depot
-        </button>
-      </div>
-
       {/* Zusammenfassung */}
       <div className="rounded-[12px] bg-bg-secondary p-4">
+        {/* Zeitraum-Dropdown */}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] text-text-muted uppercase">Theoretisches Ergebnis</p>
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value as TimeRange)}
+            className="text-[11px] font-semibold text-text-muted uppercase bg-transparent border border-border rounded-[6px] px-2 py-1 outline-none cursor-pointer appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center", paddingRight: "20px" }}
+          >
+            <option value="all">Seit Tradent</option>
+            <option value="portfolio">Seit Depot</option>
+          </select>
+        </div>
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] text-text-muted uppercase">Theoretisches Ergebnis</p>
-            <p className={`text-xl font-black mt-1 ${evaluated.length > 0 ? (totalTheoreticalPnl >= 0 ? "text-positive" : "text-negative") : "text-text-muted"}`}>
-              {evaluated.length > 0 ? `${totalTheoreticalPnl >= 0 ? "+" : ""}${totalTheoreticalPnl.toFixed(2)}€` : "–"}
-            </p>
-          </div>
+          <p className={`text-xl font-black ${evaluated.length > 0 ? (totalTheoreticalPnl >= 0 ? "text-positive" : "text-negative") : "text-text-muted"}`}>
+            {evaluated.length > 0 ? `${totalTheoreticalPnl >= 0 ? "+" : ""}${totalTheoreticalPnl.toFixed(2)}€` : "–"}
+          </p>
           <div className="text-right">
-            <p className="text-[11px] text-text-muted uppercase">Trefferquote</p>
-            <p className="text-sm font-bold text-text-primary mt-1">
+            <p className="text-sm font-bold text-text-primary">
               {evaluated.length > 0 ? `${Math.round((tpCount / evaluated.length) * 100)}%` : "–"}
               <span className="text-text-muted font-normal"> · {filteredSignals.length} Signale</span>
             </p>
