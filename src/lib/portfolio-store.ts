@@ -299,7 +299,7 @@ export async function closeTrade(
 
   if (fetchError) throw fetchError;
 
-  // 3. Portfolio-Guthaben aktualisieren (Budget + Ergebnis)
+  // 3. Portfolio-Guthaben aktualisieren (Budget zurückgeben + Ergebnis)
   const { data: portfolio, error: portfolioError } = await supabase
     .from("portfolios")
     .select("current_balance")
@@ -308,7 +308,8 @@ export async function closeTrade(
 
   if (portfolioError) throw portfolioError;
 
-  const newBalance = Number(portfolio.current_balance) + result;
+  // Budget wurde beim Öffnen abgezogen → jetzt zurück + P&L
+  const newBalance = Number(portfolio.current_balance) + Number(trade.budget) + result;
 
   const { error: updateError } = await supabase
     .from("portfolios")
@@ -362,5 +363,21 @@ export async function addTrade(trade: {
     .single();
 
   if (error) throw error;
+
+  // Budget vom Portfolio-Guthaben abziehen
+  const { data: portfolio, error: pError } = await supabase
+    .from("portfolios")
+    .select("current_balance")
+    .eq("id", trade.portfolioId)
+    .single();
+
+  if (!pError && portfolio) {
+    const newBalance = Number(portfolio.current_balance) - trade.budget;
+    await supabase
+      .from("portfolios")
+      .update({ current_balance: newBalance })
+      .eq("id", trade.portfolioId);
+  }
+
   return toTrade(row);
 }
