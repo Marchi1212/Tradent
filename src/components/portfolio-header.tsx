@@ -101,7 +101,6 @@ export default function PortfolioHeader({ portfolio, onUpdate, onCreateNew, onDe
         className="flex items-center gap-3 bg-bg-secondary rounded-[6px] px-3.5 py-2"
       >
         <span className="text-sm text-text-primary">{portfolio.name}</span>
-        <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
         <svg
           className={`w-3 h-3 text-text-primary transition-transform ${open ? "rotate-180" : ""}`}
           fill="currentColor"

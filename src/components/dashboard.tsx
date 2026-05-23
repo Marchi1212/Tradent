@@ -128,15 +128,18 @@ export default function Dashboard() {
         {/* Desktop (≥768px) */}
         <div className="hidden md:flex items-center gap-3">
           {portfolio ? (
-            <PortfolioHeader
-              portfolio={portfolio}
-              onUpdate={loadPortfolio}
-              onCreateNew={() => setShowCreatePortfolio(true)}
-              onDeleted={async () => {
-                const p = await getActivePortfolio();
-                setPortfolio(p);
-              }}
-            />
+            <>
+              <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
+              <PortfolioHeader
+                portfolio={portfolio}
+                onUpdate={loadPortfolio}
+                onCreateNew={() => setShowCreatePortfolio(true)}
+                onDeleted={async () => {
+                  const p = await getActivePortfolio();
+                  setPortfolio(p);
+                }}
+              />
+            </>
           ) : (
             <button
               onClick={() => setShowCreatePortfolio(true)}
@@ -151,7 +154,7 @@ export default function Dashboard() {
         {/* Mobile (<768px) */}
         <div className="flex md:hidden items-center gap-3">
           {portfolio && (
-            <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
+            <span className="text-lg font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
           )}
           <MobileMenu
             portfolio={portfolio}
@@ -166,7 +169,7 @@ export default function Dashboard() {
       </header>
 
       {/* Tab Bar – erst nach Laden zeigen */}
-      {loaded && <div className="sticky top-[61px] z-20 bg-bg-primary px-5 pt-4 pb-2">
+      {loaded && <div className="px-5 pt-4 pb-2">
         <div className="flex max-w-[200px] mx-auto rounded-[12px] bg-bg-secondary p-1 gap-1">
           <button
             onClick={() => setActiveTab("signals")}
