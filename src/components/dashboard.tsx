@@ -118,7 +118,7 @@ export default function Dashboard() {
     <>
       {/* Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
-        <img src="/logo.svg" alt="Tradent" className="h-5 shrink-0" />
+        <img src="/logo.svg" alt="Tradent" className="h-4 shrink-0" />
 
         {/* Desktop (≥768px) */}
         <div className="hidden md:flex items-center gap-3">
