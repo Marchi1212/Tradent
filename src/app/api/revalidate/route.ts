@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 
-export const maxDuration = 30;
+export const maxDuration = 15;
 
 // Aktuellen Kurs von Yahoo Finance laden
-async function fetchCurrentPrice(ticker: string, yahooSymbol: string): Promise<number | null> {
+async function fetchCurrentPrice(yahooSymbol: string): Promise<number | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1m&range=1d&includePrePost=false`;
     const res = await fetch(url, {
@@ -22,42 +21,40 @@ async function fetchCurrentPrice(ticker: string, yahooSymbol: string): Promise<n
   }
 }
 
-// Yahoo-Symbol aus Watchlist finden
-function getYahooSymbol(ticker: string): string {
-  const map: Record<string, string> = {
-    DE40: "^GDAXI", US500: "^GSPC", US100: "^NDX", US30: "^DJI",
-    UK100: "^FTSE", FRA40: "^FCHI", EU50: "^STOXX50E", JAP225: "^N225",
-    "TSLA.US": "TSLA", "NVDA.US": "NVDA", "AAPL.US": "AAPL",
-    "MSFT.US": "MSFT", "AMZN.US": "AMZN", "META.US": "META",
-    "GOOGL.US": "GOOGL", "AMD.US": "AMD", "NFLX.US": "NFLX",
-    "INTC.US": "INTC", "BA.US": "BA", "JPM.US": "JPM",
-    "GS.US": "GS", "DIS.US": "DIS", "KO.US": "KO",
-    "SAP.DE": "SAP.DE", "SIE.DE": "SIE.DE", "ASML.NL": "ASML.AS",
-    "LVMH.FR": "MC.PA", "VOW.DE": "VOW3.DE", "DBK.DE": "DBK.DE",
-    EURUSD: "EURUSD=X", GBPUSD: "GBPUSD=X", USDJPY: "USDJPY=X",
-    USDCHF: "USDCHF=X", EURGBP: "EURGBP=X", AUDUSD: "AUDUSD=X",
-    USDCAD: "USDCAD=X", NZDUSD: "NZDUSD=X",
-    GOLD: "GC=F", SILVER: "SI=F", PLATINUM: "PL=F",
-    "OIL.WTI": "CL=F", OIL: "BZ=F", NATGAS: "NG=F",
-    BITCOIN: "BTC-USD", ETHEREUM: "ETH-USD", SOLANA: "SOL-USD", RIPPLE: "XRP-USD",
-    CARDANO: "ADA-USD", POLKADOT: "DOT-USD", CHAINLINK: "LINK-USD", AVALANCHE: "AVAX-USD",
-    LITECOIN: "LTC-USD", DOGECOIN: "DOGE-USD", POLYGON: "MATIC-USD", UNISWAP: "UNI7083-USD",
-  };
-  return map[ticker] || ticker;
-}
+// Yahoo-Symbol aus XTB-Ticker
+const YAHOO_SYMBOLS: Record<string, string> = {
+  DE40: "^GDAXI", US500: "^GSPC", US100: "^NDX", US30: "^DJI",
+  UK100: "^FTSE", FRA40: "^FCHI", EU50: "^STOXX50E", JAP225: "^N225",
+  "TSLA.US": "TSLA", "NVDA.US": "NVDA", "AAPL.US": "AAPL",
+  "MSFT.US": "MSFT", "AMZN.US": "AMZN", "META.US": "META",
+  "GOOGL.US": "GOOGL", "AMD.US": "AMD", "NFLX.US": "NFLX",
+  "INTC.US": "INTC", "BA.US": "BA", "JPM.US": "JPM",
+  "GS.US": "GS", "DIS.US": "DIS", "KO.US": "KO",
+  "SAP.DE": "SAP.DE", "SIE.DE": "SIE.DE", "ASML.NL": "ASML.AS",
+  "LVMH.FR": "MC.PA", "VOW.DE": "VOW3.DE", "DBK.DE": "DBK.DE",
+  EURUSD: "EURUSD=X", GBPUSD: "GBPUSD=X", USDJPY: "USDJPY=X",
+  USDCHF: "USDCHF=X", EURGBP: "EURGBP=X", AUDUSD: "AUDUSD=X",
+  USDCAD: "USDCAD=X", NZDUSD: "NZDUSD=X",
+  GOLD: "GC=F", SILVER: "SI=F", PLATINUM: "PL=F",
+  "OIL.WTI": "CL=F", OIL: "BZ=F", NATGAS: "NG=F",
+  BITCOIN: "BTC-USD", ETHEREUM: "ETH-USD", SOLANA: "SOL-USD", RIPPLE: "XRP-USD",
+  CARDANO: "ADA-USD", POLKADOT: "DOT-USD", CHAINLINK: "LINK-USD", AVALANCHE: "AVAX-USD",
+  LITECOIN: "LTC-USD", DOGECOIN: "DOGE-USD", POLYGON: "MATIC-USD", UNISWAP: "UNI7083-USD",
+};
 
+// Rein mathematische Revalidierung – kein Claude-Call nötig
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { asset, ticker, direction, entry, stopLoss, takeProfit, leverage, confidence, reasoning, market, category } = body;
+    const { ticker, direction, entry, stopLoss, takeProfit, confidence } = body;
 
     if (!ticker || !entry) {
       return NextResponse.json({ error: "Fehlende Parameter" }, { status: 400 });
     }
 
-    // 1. Aktuellen Kurs laden
-    const yahooSymbol = getYahooSymbol(ticker);
-    const currentPrice = await fetchCurrentPrice(ticker, yahooSymbol);
+    // 1. Aktuellen Kurs laden (kostenlos via Yahoo Finance)
+    const yahooSymbol = YAHOO_SYMBOLS[ticker] || ticker;
+    const currentPrice = await fetchCurrentPrice(yahooSymbol);
 
     if (!currentPrice) {
       return NextResponse.json({ error: "Aktueller Kurs konnte nicht geladen werden" }, { status: 502 });
@@ -65,70 +62,84 @@ export async function POST(request: Request) {
 
     // 2. Kursabweichung berechnen
     const priceDiffPercent = ((currentPrice - entry) / entry) * 100;
+    const absDiff = Math.abs(priceDiffPercent);
 
-    // 3. Claude Re-Check
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    // 3. SL/TP-Abstände berechnen
+    const slDistance = Math.abs(entry - stopLoss);
+    const tpDistance = Math.abs(takeProfit - entry);
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 800,
-      system: `Du bist ein CFD-Daytrading-Analyst. Ein Signal wurde heute morgen generiert. Der Trader will jetzt die Position eröffnen. Prüfe ob der Trade bei aktuellem Kurs noch sinnvoll ist und passe die Werte an.
+    // 4. Validität prüfen
+    let valid = true;
+    let reason = "";
+    let adjustedConfidence = confidence;
 
-Antworte ausschließlich mit JSON, kein anderer Text.`,
-      messages: [
-        {
-          role: "user",
-          content: `Original-Signal:
-- Asset: ${asset} (${ticker})
-- Richtung: ${direction}
-- Kategorie: ${category} | Markt: ${market}
-- Entry: ${entry}
-- Stop-Loss: ${stopLoss}
-- Take-Profit: ${takeProfit}
-- Hebel: ${leverage}
-- Konfidenz: ${confidence}%
-- Begründung: ${reasoning}
-
-Aktueller Kurs: ${currentPrice} (${priceDiffPercent > 0 ? "+" : ""}${priceDiffPercent.toFixed(2)}% seit Signal)
-
-Prüfe:
-1. Ist der Trade bei aktuellem Kurs noch valide?
-2. Passe Entry auf den aktuellen Kurs an
-3. Passe SL und TP proportional an (gleicher Abstand)
-4. Aktualisiere die Konfidenz basierend auf der Kursentwicklung
-
-Antworte NUR mit diesem JSON:
-{
-  "valid": true/false,
-  "entry": aktueller_entry,
-  "stopLoss": angepasster_sl,
-  "takeProfit": angepasstes_tp,
-  "confidence": aktualisierte_konfidenz,
-  "reason": "Kurze Begründung auf Deutsch warum valide/invalide"
-}`,
-        },
-      ],
-    });
-
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("Keine Antwort von Claude");
+    if (direction === "LONG") {
+      // Kurs bereits am oder über TP → zu spät
+      if (currentPrice >= takeProfit) {
+        valid = false;
+        reason = "Kurs hat Take-Profit bereits erreicht. Trade nicht mehr sinnvoll.";
+      }
+      // Kurs bereits am oder unter SL → falscher Einstieg
+      else if (currentPrice <= stopLoss) {
+        valid = false;
+        reason = "Kurs ist unter den Stop-Loss gefallen. Signal ungültig.";
+      }
+      // Kurs stark gestiegen → Risk/Reward verschlechtert
+      else if (currentPrice > entry + tpDistance * 0.6) {
+        valid = false;
+        reason = `Kurs ist ${absDiff.toFixed(1)}% gestiegen. Verbleibendes Potenzial zu gering.`;
+      }
+      // Kurs leicht gestiegen → etwas weniger Konfidenz
+      else if (currentPrice > entry) {
+        adjustedConfidence = Math.max(50, confidence - Math.round(absDiff * 3));
+        reason = `Kurs ${absDiff.toFixed(1)}% über Signal-Entry. Levels proportional angepasst.`;
+      }
+      // Kurs leicht gefallen → etwas mehr Konfidenz (besserer Einstieg)
+      else if (currentPrice < entry) {
+        adjustedConfidence = Math.min(95, confidence + Math.round(absDiff * 2));
+        reason = `Kurs ${absDiff.toFixed(1)}% unter Signal-Entry. Besserer Einstieg möglich.`;
+      }
+      // Kurs nahezu unverändert
+      else {
+        reason = "Kurs nahezu unverändert. Trade bestätigt.";
+      }
+    } else {
+      // SHORT
+      if (currentPrice <= takeProfit) {
+        valid = false;
+        reason = "Kurs hat Take-Profit bereits erreicht. Trade nicht mehr sinnvoll.";
+      } else if (currentPrice >= stopLoss) {
+        valid = false;
+        reason = "Kurs ist über den Stop-Loss gestiegen. Signal ungültig.";
+      } else if (currentPrice < entry - tpDistance * 0.6) {
+        valid = false;
+        reason = `Kurs ist ${absDiff.toFixed(1)}% gefallen. Verbleibendes Potenzial zu gering.`;
+      } else if (currentPrice < entry) {
+        adjustedConfidence = Math.max(50, confidence - Math.round(absDiff * 3));
+        reason = `Kurs ${absDiff.toFixed(1)}% unter Signal-Entry. Levels proportional angepasst.`;
+      } else if (currentPrice > entry) {
+        adjustedConfidence = Math.min(95, confidence + Math.round(absDiff * 2));
+        reason = `Kurs ${absDiff.toFixed(1)}% über Signal-Entry. Besserer Short-Einstieg möglich.`;
+      } else {
+        reason = "Kurs nahezu unverändert. Trade bestätigt.";
+      }
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Kein JSON in Antwort");
-
-    const result = JSON.parse(jsonMatch[0]);
+    // 5. Neue Levels berechnen (Entry auf aktuellen Kurs, SL/TP proportional verschieben)
+    const shift = currentPrice - entry;
+    const newEntry = currentPrice;
+    const newStopLoss = Math.round((stopLoss + shift) * 10000) / 10000;
+    const newTakeProfit = Math.round((takeProfit + shift) * 10000) / 10000;
 
     return NextResponse.json({
       currentPrice,
       priceDiffPercent: Math.round(priceDiffPercent * 100) / 100,
-      valid: result.valid,
-      entry: result.entry,
-      stopLoss: result.stopLoss,
-      takeProfit: result.takeProfit,
-      confidence: result.confidence,
-      reason: result.reason,
+      valid,
+      entry: newEntry,
+      stopLoss: newStopLoss,
+      takeProfit: newTakeProfit,
+      confidence: adjustedConfidence,
+      reason,
     });
   } catch (err) {
     console.error("Revalidierung fehlgeschlagen:", err);
