@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Portfolio } from "@/lib/portfolio-store";
-import { getPortfolios, setActivePortfolio, deletePortfolio } from "@/lib/portfolio-store";
+import { getPortfolios, setActivePortfolio } from "@/lib/portfolio-store";
 import SignOutButton from "@/app/sign-out-button";
 
 interface Props {
@@ -11,21 +11,18 @@ interface Props {
   onUpdate: () => void;
   onCreateNew: () => void;
   onDeleted: () => void;
+  onEdit: () => void;
 }
 
-export default function MobileMenu({ portfolio, onUpdate, onCreateNew, onDeleted }: Props) {
+export default function MobileMenu({ portfolio, onUpdate, onCreateNew, onDeleted, onEdit }: Props) {
   const [open, setOpen] = useState(false);
   const [allPortfolios, setAllPortfolios] = useState<Portfolio[]>([]);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open && portfolio) {
       getPortfolios().then(setAllPortfolios).catch(console.error);
-    } else {
-      setConfirmDelete(false);
     }
   }, [open, portfolio]);
 
@@ -50,26 +47,6 @@ export default function MobileMenu({ portfolio, onUpdate, onCreateNew, onDeleted
       onUpdate();
     } catch (err) {
       console.error("Portfolio wechseln fehlgeschlagen:", err);
-    }
-  }
-
-  async function handleDelete() {
-    if (!portfolio) return;
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    try {
-      setDeleting(true);
-      await deletePortfolio(portfolio.id);
-      setConfirmDelete(false);
-      setOpen(false);
-      onDeleted();
-    } catch (err) {
-      console.error("Portfolio löschen fehlgeschlagen:", err);
-      setConfirmDelete(false);
-    } finally {
-      setDeleting(false);
     }
   }
 
@@ -102,11 +79,21 @@ export default function MobileMenu({ portfolio, onUpdate, onCreateNew, onDeleted
           ref={menuRef}
           className="fixed top-[53px] left-0 right-0 bg-bg-primary border-b border-border shadow-lg z-[9999]"
         >
-          {/* Aktives Portfolio */}
+          {/* Aktives Portfolio + Bearbeiten */}
           {portfolio && (
-            <div className="px-5 py-3 border-b border-border">
-              <p className="text-[11px] text-text-muted uppercase">Aktives Depot</p>
-              <p className="text-sm font-bold text-text-primary mt-0.5">{portfolio.name}</p>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+              <div>
+                <p className="text-[11px] text-text-muted uppercase">Aktives Depot</p>
+                <p className="text-sm font-bold text-text-primary mt-0.5">{portfolio.name}</p>
+              </div>
+              <button
+                onClick={() => { setOpen(false); onEdit(); }}
+                className="p-2 text-text-muted hover:text-text-primary transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                </svg>
+              </button>
             </div>
           )}
 
@@ -132,42 +119,6 @@ export default function MobileMenu({ portfolio, onUpdate, onCreateNew, onDeleted
             </svg>
             Neues Depot
           </button>
-
-          {/* Depot löschen */}
-          {portfolio && (
-            <div className="border-t border-border">
-              {confirmDelete ? (
-                <div className="flex items-center justify-between px-5 py-3">
-                  <span className="text-sm text-red-500">Wirklich löschen?</span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="text-sm font-bold text-red-500 hover:text-red-600 transition-colors"
-                    >
-                      {deleting ? "…" : "Ja"}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(false)}
-                      className="text-sm text-text-muted hover:text-text-primary transition-colors"
-                    >
-                      Nein
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={handleDelete}
-                  className="w-full flex items-center gap-3 px-5 py-3 text-sm text-red-500 hover:bg-bg-secondary transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                  </svg>
-                  Depot löschen
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Abmelden */}
           <div className="border-t border-border">

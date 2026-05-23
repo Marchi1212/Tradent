@@ -6,6 +6,7 @@ import { getActivePortfolio, allocateCapital, type Portfolio } from "@/lib/portf
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
+import EditPortfolio from "./edit-portfolio";
 import PortfolioHeader from "./portfolio-header";
 import MobileMenu from "./mobile-menu";
 import SignOutButton from "@/app/sign-out-button";
@@ -40,6 +41,7 @@ function parseSignalInputs(signals: { steady: Signal; bold: Signal }) {
 export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
+  const [showEditPortfolio, setShowEditPortfolio] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("signals");
   const [loaded, setLoaded] = useState(false);
   const [signals, setSignals] = useState<{ steady: Signal; bold: Signal } | null>(null);
@@ -138,6 +140,7 @@ export default function Dashboard() {
                   const p = await getActivePortfolio();
                   setPortfolio(p);
                 }}
+                onEdit={() => setShowEditPortfolio(true)}
               />
             </>
           ) : (
@@ -164,6 +167,7 @@ export default function Dashboard() {
               const p = await getActivePortfolio();
               setPortfolio(p);
             }}
+            onEdit={() => setShowEditPortfolio(true)}
           />
         </div>
       </header>
@@ -286,6 +290,23 @@ export default function Dashboard() {
             setShowCreatePortfolio(false);
           }}
           onCancel={() => setShowCreatePortfolio(false)}
+        />
+      )}
+
+      {/* Edit Portfolio Modal */}
+      {showEditPortfolio && portfolio && (
+        <EditPortfolio
+          portfolio={portfolio}
+          onSaved={() => {
+            loadPortfolio();
+            setShowEditPortfolio(false);
+          }}
+          onDeleted={async () => {
+            setShowEditPortfolio(false);
+            const p = await getActivePortfolio();
+            setPortfolio(p);
+          }}
+          onCancel={() => setShowEditPortfolio(false)}
         />
       )}
     </>
