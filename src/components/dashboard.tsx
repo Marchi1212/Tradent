@@ -288,7 +288,7 @@ export default function Dashboard() {
             ) : null}
           </>
         ) : portfolio ? (
-          <TradeHistory portfolioId={portfolio.id} />
+          <TradeHistory portfolio={portfolio} />
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-sm font-semibold text-text-primary">Kein Portfolio aktiv</p>

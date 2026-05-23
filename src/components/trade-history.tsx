@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Trade } from "@/lib/portfolio-store";
-import { getTrades } from "@/lib/portfolio-store";
+import type { Trade, Portfolio } from "@/lib/portfolio-store";
+import { getTrades, allocateCapital } from "@/lib/portfolio-store";
 import { createClient } from "@/lib/supabase/client";
+
+// XTB-Spreads als % vom Kurs (konservativ, Round-Trip)
+const SPREAD_PERCENT: Record<string, number> = {
+  Index: 0.03, Aktie: 0.06, Forex: 0.015, Rohstoff: 0.04, Krypto: 0.20,
+};
 
 interface SignalRecord {
   id: string;
@@ -20,6 +25,7 @@ interface SignalRecord {
   reasoning: string;
   market: string;
   category: string;
+  risk_reward_ratio: string;
   outcome: string | null;
   actual_close: number | null;
   created_at: string;
@@ -28,10 +34,11 @@ interface SignalRecord {
 type SubTab = "my-trades" | "all-signals";
 
 interface Props {
-  portfolioId: string;
+  portfolio: Portfolio;
 }
 
-export default function TradeHistory({ portfolioId }: Props) {
+export default function TradeHistory({ portfolio }: Props) {
+  const portfolioId = portfolio.id;
   const [subTab, setSubTab] = useState<SubTab>("my-trades");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -74,7 +81,7 @@ export default function TradeHistory({ portfolioId }: Props) {
       {subTab === "my-trades" ? (
         <MyTrades trades={trades} />
       ) : (
-        <AllSignals />
+        <AllSignals budget={portfolio.budget} />
       )}
     </div>
   );
@@ -156,7 +163,44 @@ function MyTrades({ trades }: { trades: Trade[] }) {
 
 /* ── Alle Signale ────────────────────────────── */
 
-function AllSignals() {
+// Theoretisches P&L für ein Signal berechnen (was wäre passiert?)
+function calcSignalPnl(signal: SignalRecord, budget: number): number | null {
+  if (!signal.outcome) return null;
+
+  const leverage = parseFloat(signal.leverage) || 1;
+  const spreadPct = SPREAD_PERCENT[signal.category] || 0.05;
+  const spreadCostPct = spreadPct * leverage;
+
+  let exitPrice: number;
+  if (signal.outcome === "tp_hit") exitPrice = signal.take_profit;
+  else if (signal.outcome === "sl_hit") exitPrice = signal.stop_loss;
+  else if (signal.actual_close) exitPrice = signal.actual_close;
+  else return null;
+
+  let movePct: number;
+  if (signal.direction === "LONG") {
+    movePct = ((exitPrice - signal.entry) / signal.entry) * 100 * leverage;
+  } else {
+    movePct = ((signal.entry - exitPrice) / signal.entry) * 100 * leverage;
+  }
+
+  // Spread-Kosten abziehen
+  const netPct = movePct - spreadCostPct;
+  return budget * (netPct / 100);
+}
+
+// Kelly-Inputs aus Signal-Record erstellen
+function signalToKellyInput(s: SignalRecord) {
+  const leverage = parseFloat(s.leverage) || 1;
+  const slPercent = s.direction === "LONG"
+    ? ((s.entry - s.stop_loss) / s.entry) * 100
+    : ((s.stop_loss - s.entry) / s.entry) * 100;
+  const rrStr = s.risk_reward_ratio || "1:1.5";
+  const rr = parseFloat(rrStr.split(":")[1]) || 1.5;
+  return { confidence: s.confidence, riskRewardRatio: rr, stopLossPercent: slPercent, leverage };
+}
+
+function AllSignals({ budget }: { budget: number }) {
   const [signals, setSignals] = useState<SignalRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -202,9 +246,29 @@ function AllSignals() {
     byDate.get(dateStr)!.push(s);
   }
 
+  // Kelly-Allokation pro Tages-Paar berechnen
+  const allocationMap = new Map<string, number>();
+  for (const [, daySignals] of byDate) {
+    if (daySignals.length >= 2) {
+      const kellyInputs = daySignals.map(signalToKellyInput);
+      const allocations = allocateCapital(budget, kellyInputs);
+      daySignals.forEach((s, i) => allocationMap.set(s.id, allocations[i] || 0));
+    } else {
+      // Einzelnes Signal → einfache Allokation (45% des Budgets)
+      daySignals.forEach((s) => allocationMap.set(s.id, Math.floor(budget * 0.45)));
+    }
+  }
+
+  // Theoretisches Gesamtergebnis berechnen
   const evaluated = signals.filter((s) => s.outcome !== null);
   const tpCount = signals.filter((s) => s.outcome === "tp_hit").length;
   const slCount = signals.filter((s) => s.outcome === "sl_hit").length;
+  let totalTheoreticalPnl = 0;
+  for (const s of evaluated) {
+    const alloc = allocationMap.get(s.id) || 0;
+    const pnl = calcSignalPnl(s, alloc);
+    if (pnl !== null) totalTheoreticalPnl += pnl;
+  }
 
   return (
     <div className="space-y-5">
@@ -212,15 +276,16 @@ function AllSignals() {
       <div className="rounded-[12px] bg-bg-secondary p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-text-muted uppercase">Trefferquote</p>
-            <p className={`text-xl font-black mt-1 ${evaluated.length > 0 ? (tpCount >= slCount ? "text-positive" : "text-negative") : "text-text-muted"}`}>
-              {evaluated.length > 0 ? `${Math.round((tpCount / evaluated.length) * 100)}%` : "–"}
+            <p className="text-[11px] text-text-muted uppercase">Theoretisches Ergebnis</p>
+            <p className={`text-xl font-black mt-1 ${evaluated.length > 0 ? (totalTheoreticalPnl >= 0 ? "text-positive" : "text-negative") : "text-text-muted"}`}>
+              {evaluated.length > 0 ? `${totalTheoreticalPnl >= 0 ? "+" : ""}${totalTheoreticalPnl.toFixed(2)}€` : "–"}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[11px] text-text-muted uppercase">Signale</p>
+            <p className="text-[11px] text-text-muted uppercase">Trefferquote</p>
             <p className="text-sm font-bold text-text-primary mt-1">
-              {signals.length} gesamt{evaluated.length > 0 ? ` · ${tpCount} TP · ${slCount} SL` : ""}
+              {evaluated.length > 0 ? `${Math.round((tpCount / evaluated.length) * 100)}%` : "–"}
+              <span className="text-text-muted font-normal"> · {signals.length} Signale</span>
             </p>
           </div>
         </div>
@@ -231,7 +296,7 @@ function AllSignals() {
           <p className="text-[11px] text-text-muted uppercase font-semibold mb-3">{date}</p>
           <div className="space-y-2">
             {daySignals.map((s) => (
-              <SignalRow key={s.id} signal={s} />
+              <SignalRow key={s.id} signal={s} allocatedBudget={allocationMap.get(s.id) || 0} />
             ))}
           </div>
         </div>
@@ -240,7 +305,7 @@ function AllSignals() {
   );
 }
 
-function SignalRow({ signal }: { signal: SignalRecord }) {
+function SignalRow({ signal, allocatedBudget }: { signal: SignalRecord; allocatedBudget: number }) {
   const [expanded, setExpanded] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
 
@@ -251,17 +316,18 @@ function SignalRow({ signal }: { signal: SignalRecord }) {
     minute: "2-digit",
   });
 
+  const pnl = calcSignalPnl(signal, allocatedBudget);
   const hasOutcome = signal.outcome !== null;
-  const isTP = signal.outcome === "tp_hit";
-  const isSL = signal.outcome === "sl_hit";
-  const isPartial = signal.outcome === "partial";
-  const isNeutral = signal.outcome === "neutral";
 
   function outcomeLabel() {
-    if (isTP) return <span className="text-sm font-bold text-green-400">TP ✓</span>;
-    if (isSL) return <span className="text-sm font-bold text-red-400">SL ✕</span>;
-    if (isPartial) return <span className="text-sm font-bold text-amber-400">Teilgewinn</span>;
-    if (isNeutral) return <span className="text-sm font-bold text-white/50">Neutral</span>;
+    if (pnl !== null) {
+      const isPositive = pnl >= 0;
+      return (
+        <span className={`text-sm font-bold ${isPositive ? "text-green-400" : "text-red-400"}`}>
+          {isPositive ? "+" : ""}{pnl.toFixed(2)}€
+        </span>
+      );
+    }
     return <span className="text-xs text-white/40">ausstehend</span>;
   }
 
