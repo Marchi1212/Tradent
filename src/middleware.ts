@@ -2,6 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // Cron-geschützte API-Routen brauchen keine Session (haben eigenen CRON_SECRET-Check)
+  const cronRoutes = ["/api/push/send", "/api/evaluate", "/api/revalidate"];
+  if (cronRoutes.some((r) => request.nextUrl.pathname.startsWith(r))) {
+    return NextResponse.next({ request });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
