@@ -93,6 +93,7 @@ export default function SignalCard({
   onPortfolioUpdate?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
   const [positionOpened, setPositionOpened] = useState(false);
   const [marketInfo, setMarketInfo] = useState(getMarketInfo(signal.market));
 
@@ -607,10 +608,20 @@ export default function SignalCard({
             );
           })()}
 
-          {/* Reasoning */}
+          {/* Reasoning Toggle */}
           <div className={`pt-4 border-t ${c.border}`}>
-            <p className={`text-[13px] ${c.textMut} uppercase mb-2`}>Begründung</p>
-            <p className={`text-sm ${c.textSec} leading-relaxed`}>{signal.reasoning}</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowReasoning(!showReasoning);
+              }}
+              className={`text-[13px] font-medium ${c.textMut} transition-colors hover:text-white/80`}
+            >
+              {showReasoning ? "Begründung ausblenden" : "Begründung anzeigen"}
+            </button>
+            {showReasoning && (
+              <p className={`text-sm ${c.textSec} leading-relaxed mt-2`}>{signal.reasoning}</p>
+            )}
           </div>
 
           {/* Risk + Budget Info */}
@@ -711,7 +722,7 @@ export default function SignalCard({
                       {/* Bestätigt */}
                       <div className="flex items-center gap-2">
                         <span className="text-green-500 text-base">✓</span>
-                        <span className={`text-sm font-bold ${c.text}`}>Trade bestätigt</span>
+                        <span className={`text-sm font-bold ${c.text}`}>Trade geprüft</span>
                         <span className={`text-[13px] ${c.textMut} ml-auto`}>
                           Konfidenz: {revalidation.confidence}%
                         </span>
