@@ -249,8 +249,8 @@ export default function Dashboard() {
               </div>
             ) : signals ? (
               <div className="space-y-4">
-                <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} />
-                <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} />
+                <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={loadPortfolio} />
+                <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={loadPortfolio} />
               </div>
             ) : null}
           </>

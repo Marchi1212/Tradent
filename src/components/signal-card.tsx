@@ -53,14 +53,25 @@ function CopyableValue({ label, value, displayValue }: { label: string; value: s
   );
 }
 
+// Typische XTB-Spreads als % vom Kurs (konservative Schätzung, Round-Trip)
+const SPREAD_PERCENT: Record<string, number> = {
+  Index: 0.03,
+  Aktie: 0.06,
+  Forex: 0.015,
+  Rohstoff: 0.04,
+  Krypto: 0.20,
+};
+
 export default function SignalCard({
   signal,
   portfolio,
   allocatedBudget,
+  onPortfolioUpdate,
 }: {
   signal: Signal;
   portfolio: Portfolio | null;
   allocatedBudget: number;
+  onPortfolioUpdate?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [positionOpened, setPositionOpened] = useState(false);
@@ -130,25 +141,32 @@ export default function SignalCard({
 
   // Berechnungen basierend auf Kelly-Allokation vom Dashboard
   const leverage = parseFloat(signal.leverage);
-  const slPercent =
-    signal.direction === "LONG"
-      ? ((signal.entry - signal.stopLoss) / signal.entry) * 100
-      : ((signal.stopLoss - signal.entry) / signal.entry) * 100;
-  const tpPercent =
+  const spreadPct = SPREAD_PERCENT[signal.category] || 0.05;
+  const spreadCostPct = spreadPct * leverage; // Spread × Hebel = effektive Kosten in %
+
+  const tpPctRaw =
     signal.direction === "LONG"
       ? ((signal.takeProfit - signal.entry) / signal.entry) * 100
       : ((signal.entry - signal.takeProfit) / signal.entry) * 100;
+  const slPctRaw =
+    signal.direction === "LONG"
+      ? ((signal.entry - signal.stopLoss) / signal.entry) * 100
+      : ((signal.stopLoss - signal.entry) / signal.entry) * 100;
+
+  // Spread-bereinigt: Gewinn wird kleiner, Verlust wird größer
+  const tpPercent = tpPctRaw * leverage - spreadCostPct;
+  const slPercent = slPctRaw * leverage + spreadCostPct;
 
   const expectedGainEuro = hasPortfolio
-    ? (allocatedBudget * leverage * tpPercent / 100).toFixed(2)
+    ? (allocatedBudget * tpPercent / 100).toFixed(2)
     : "0";
   const maxLossEuro = hasPortfolio
-    ? (allocatedBudget * leverage * slPercent / 100).toFixed(2)
+    ? (allocatedBudget * slPercent / 100).toFixed(2)
     : "0";
 
   // Beispielrechnung ohne Portfolio (200€ Beispiel)
   const exampleBudget = 200;
-  const exampleGain = (exampleBudget * leverage * tpPercent / 100).toFixed(0);
+  const exampleGain = (exampleBudget * tpPercent / 100).toFixed(0);
 
   // Schritt 1: Revalidierung starten
   async function handleRevalidate() {
@@ -212,6 +230,7 @@ export default function SignalCard({
       setRevalidation(null);
       // Close-Notification schedulen (30 min vor Marktschluss)
       scheduleCloseNotification(signal.id, signal.asset, signal.marketCloseTime);
+      onPortfolioUpdate?.();
     } catch (err) {
       console.error("Trade öffnen fehlgeschlagen:", err);
     }
@@ -262,6 +281,7 @@ export default function SignalCard({
       setPositionOpened(false);
       setCloseResult(null);
       cancelCloseNotification(signal.id);
+      onPortfolioUpdate?.();
     } catch (err) {
       console.error("Position schließen fehlgeschlagen:", err);
     }
@@ -370,7 +390,7 @@ export default function SignalCard({
         <div className="flex items-center justify-between mt-3">
           <div className={`${c.gainBg} rounded-[6px] px-3 py-1.5`}>
             <p className={`text-sm ${c.text}`}>
-              <span className="font-bold">+{signal.expectedGainPercent}%</span>
+              <span className="font-bold">+{tpPercent.toFixed(1)}%</span>
               {" · "}
               {hasPortfolio ? (
                 <>
