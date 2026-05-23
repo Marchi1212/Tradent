@@ -85,7 +85,7 @@ Regeln:
 - Krypto-Volatilität am Wochenende beachten (oft niedriger, aber mit plötzlichen Spikes)
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes 2-Stunden-Zeitfenster (z.B. "09:00–11:00", "14:00–16:00"). MAXIMAL 2 Stunden breit, nicht breiter!
-- marketCloseTime = "23:59" (Krypto 24/7, aber Trade soll am selben Tag geschlossen werden)
+- marketCloseTime = "21:00" (Krypto 24/7, aber Trade soll abends geschlossen werden)
 - Begründung auf Deutsch, 2-3 Sätze
 - Performance first – analysiere jedes Asset sorgfältig
 
@@ -201,7 +201,7 @@ ${instruction} Antworte NUR mit diesem JSON:
     "riskRewardRatio": "1:2.5",
     "reasoning": "Begründung auf Deutsch...",
     "market": "Krypto",
-    "marketCloseTime": "23:59",
+    "marketCloseTime": "21:00",
     "optimalEntry": "15:30–16:30",
     "category": "Krypto"
   }
