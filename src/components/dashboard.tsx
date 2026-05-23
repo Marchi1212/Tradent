@@ -16,6 +16,7 @@ import {
   hasPermission,
   permissionState,
   scheduleEntryNotification,
+  subscribeToPush,
 } from "@/lib/notifications";
 
 type Tab = "signals" | "trades";
@@ -90,7 +91,11 @@ export default function Dashboard() {
     initNotifications().then(() => {
       const state = permissionState();
       if (state === "unsupported") setNotifState("unsupported");
-      else if (state === "granted") setNotifState("granted");
+      else if (state === "granted") {
+        setNotifState("granted");
+        // Push-Subscription erneuern (falls Browser/Gerät gewechselt)
+        subscribeToPush();
+      }
       else if (state === "denied") setNotifState("denied");
       else setNotifState("prompt"); // "default" → show prompt
     });
@@ -200,9 +205,13 @@ export default function Dashboard() {
                 onClick={async () => {
                   const granted = await requestPermission();
                   setNotifState(granted ? "granted" : "denied");
-                  if (granted && signals) {
-                    for (const s of [signals.steady, signals.bold]) {
-                      scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+                  if (granted) {
+                    // Push-Subscription beim Server registrieren
+                    await subscribeToPush();
+                    if (signals) {
+                      for (const s of [signals.steady, signals.bold]) {
+                        scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+                      }
                     }
                   }
                 }}

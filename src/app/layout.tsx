@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   title: "Tradent",
   description: "Daily Trade Advisor",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport = {

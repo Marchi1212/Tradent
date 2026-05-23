@@ -6,6 +6,7 @@ import type { Portfolio } from "@/lib/portfolio-store";
 import { getOpenTradeForSignal, getTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 import { scheduleCloseNotification, cancelCloseNotification } from "@/lib/notifications";
+import { queueCloseReminder, unqueueCloseReminder } from "@/lib/push-queue";
 
 function ClockIcon({ className }: { className?: string }) {
   return (
@@ -135,8 +136,9 @@ export default function SignalCard({
           if (trade.status === "open") {
             setPositionOpened(true);
             setOpenTrade(trade);
-            // Close-Notification für bestehende offene Position
+            // Close-Reminder: lokal + Server-Push
             scheduleCloseNotification(signal.id, signal.asset, signal.marketCloseTime);
+            queueCloseReminder(signal.id, signal.asset, signal.marketCloseTime);
           } else {
             setPositionClosed(true);
             if (trade.result != null) {
@@ -212,6 +214,7 @@ export default function SignalCard({
           setPositionOpened(false);
           setCloseResult({ exitPrice, pnl, pnlPercent: Math.round(pnlPct * 100) / 100 });
           cancelCloseNotification(signal.id);
+          unqueueCloseReminder(signal.id);
           onPortfolioUpdate?.();
           console.log(`Auto-Close: ${signal.asset} – ${reason} (${pnl >= 0 ? "+" : ""}${pnl}€)`);
         }
@@ -320,8 +323,9 @@ export default function SignalCard({
       setOpenTrade(trade);
       setPositionOpened(true);
       setRevalidation(null);
-      // Close-Notification schedulen (30 min vor Marktschluss)
+      // Close-Reminder: lokal (wenn App offen) + Server-Push (wenn App zu)
       scheduleCloseNotification(signal.id, signal.asset, signal.marketCloseTime);
+      queueCloseReminder(signal.id, signal.asset, signal.marketCloseTime);
       onPortfolioUpdate?.();
     } catch (err) {
       console.error("Trade öffnen fehlgeschlagen:", err);
@@ -373,6 +377,7 @@ export default function SignalCard({
       setPositionOpened(false);
       setCloseResult(null);
       cancelCloseNotification(signal.id);
+      unqueueCloseReminder(signal.id);
       onPortfolioUpdate?.();
     } catch (err) {
       console.error("Position schließen fehlgeschlagen:", err);
