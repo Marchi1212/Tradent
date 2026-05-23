@@ -185,11 +185,12 @@ export default function SignalCard({
         const trade = openTrade!;
         const lev = parseFloat(signal.leverage);
 
-        // Live P&L berechnen (bei jedem Price-Check)
+        // Live P&L berechnen (bei jedem Price-Check, mit Spread)
+        const liveSpreadCost = (SPREAD_PERCENT[signal.category] || 0.05) * lev;
         const liveDiff = trade.direction === "LONG"
           ? price - trade.entry
           : trade.entry - price;
-        const livePnlPct = (liveDiff / trade.entry) * 100 * lev;
+        const livePnlPct = (liveDiff / trade.entry) * 100 * lev - liveSpreadCost;
         const livePnlEur = Math.round(trade.budget * (livePnlPct / 100) * 100) / 100;
         setLivePnl({
           currentPrice: price,
@@ -224,11 +225,11 @@ export default function SignalCard({
         }
 
         if (shouldClose) {
-          const lev = parseFloat(signal.leverage);
+          const closeSpreadCost = (SPREAD_PERCENT[signal.category] || 0.05) * lev;
           const priceDiff = trade.direction === "LONG"
             ? exitPrice - trade.entry
             : trade.entry - exitPrice;
-          const pnlPct = (priceDiff / trade.entry) * 100 * lev;
+          const pnlPct = (priceDiff / trade.entry) * 100 * lev - closeSpreadCost;
           const pnl = Math.round(trade.budget * (pnlPct / 100) * 100) / 100;
 
           await closeTrade(trade.id, exitPrice, pnl);
@@ -371,11 +372,12 @@ export default function SignalCard({
       const { price } = await res.json();
       const leverage = parseFloat(signal.leverage);
 
-      // P&L berechnen
+      // P&L berechnen (mit Spread)
+      const manualSpreadCost = (SPREAD_PERCENT[signal.category] || 0.05) * leverage;
       const priceDiff = openTrade.direction === "LONG"
         ? price - openTrade.entry
         : openTrade.entry - price;
-      const pnlPercent = (priceDiff / openTrade.entry) * 100 * leverage;
+      const pnlPercent = (priceDiff / openTrade.entry) * 100 * leverage - manualSpreadCost;
       const pnl = openTrade.budget * (pnlPercent / 100);
 
       setCloseResult({
