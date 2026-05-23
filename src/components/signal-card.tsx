@@ -5,6 +5,7 @@ import type { Signal } from "@/lib/mock-signals";
 import type { Portfolio } from "@/lib/portfolio-store";
 import { getOpenTradeForSignal, getTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
+import { scheduleCloseNotification, cancelCloseNotification } from "@/lib/notifications";
 
 function ClockIcon({ className }: { className?: string }) {
   return (
@@ -98,6 +99,8 @@ export default function SignalCard({
           if (trade.status === "open") {
             setPositionOpened(true);
             setOpenTrade(trade);
+            // Close-Notification für bestehende offene Position
+            scheduleCloseNotification(signal.id, signal.asset, signal.marketCloseTime);
           } else {
             setPositionClosed(true);
             if (trade.result != null) {
@@ -207,6 +210,8 @@ export default function SignalCard({
       setOpenTrade(trade);
       setPositionOpened(true);
       setRevalidation(null);
+      // Close-Notification schedulen (30 min vor Marktschluss)
+      scheduleCloseNotification(signal.id, signal.asset, signal.marketCloseTime);
     } catch (err) {
       console.error("Trade öffnen fehlgeschlagen:", err);
     }
@@ -256,6 +261,7 @@ export default function SignalCard({
       setPositionClosed(true);
       setPositionOpened(false);
       setCloseResult(null);
+      cancelCloseNotification(signal.id);
     } catch (err) {
       console.error("Position schließen fehlgeschlagen:", err);
     }

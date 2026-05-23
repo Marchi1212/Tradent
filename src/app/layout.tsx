@@ -10,6 +10,7 @@ const hanken = Hanken_Grotesk({
 export const metadata: Metadata = {
   title: "Tradent",
   description: "Daily Trade Advisor",
+  manifest: "/manifest.json",
 };
 
 export const viewport = {

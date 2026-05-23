@@ -10,6 +10,13 @@ import PortfolioHeader from "./portfolio-header";
 import MobileMenu from "./mobile-menu";
 import SignOutButton from "@/app/sign-out-button";
 import { isWeekend, isGermanHoliday } from "@/lib/market-hours";
+import {
+  initNotifications,
+  requestPermission,
+  hasPermission,
+  permissionState,
+  scheduleEntryNotification,
+} from "@/lib/notifications";
 
 type Tab = "signals" | "trades";
 
@@ -38,6 +45,7 @@ export default function Dashboard() {
   const [signalsLoading, setSignalsLoading] = useState(true);
   const [signalsError, setSignalsError] = useState<string | null>(null);
   const [signalsWaitUntil, setSignalsWaitUntil] = useState<string | null>(null);
+  const [notifState, setNotifState] = useState<"unknown" | "granted" | "denied" | "prompt" | "unsupported">("unknown");
 
   async function loadPortfolio() {
     try {
@@ -78,7 +86,23 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([loadPortfolio(), loadSignals()]).then(() => setLoaded(true));
+    // Service Worker + Notifications initialisieren
+    initNotifications().then(() => {
+      const state = permissionState();
+      if (state === "unsupported") setNotifState("unsupported");
+      else if (state === "granted") setNotifState("granted");
+      else if (state === "denied") setNotifState("denied");
+      else setNotifState("prompt"); // "default" → show prompt
+    });
   }, []);
+
+  // Entry-Notifications schedulen sobald Signale geladen sind
+  useEffect(() => {
+    if (!signals || !hasPermission()) return;
+    for (const s of [signals.steady, signals.bold]) {
+      scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+    }
+  }, [signals]);
 
   const allocations = portfolio && signals
     ? allocateCapital(portfolio.currentBalance, parseSignalInputs(signals))
@@ -171,6 +195,26 @@ export default function Dashboard() {
         ) : activeTab === "signals" ? (
           <>
             <p className="text-sm text-text-muted">{today}</p>
+            {notifState === "prompt" && (
+              <button
+                onClick={async () => {
+                  const granted = await requestPermission();
+                  setNotifState(granted ? "granted" : "denied");
+                  if (granted && signals) {
+                    for (const s of [signals.steady, signals.bold]) {
+                      scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+                    }
+                  }
+                }}
+                className="flex items-center gap-2 w-full rounded-[12px] bg-bg-secondary px-4 py-3 text-left transition-colors hover:bg-bg-secondary/80"
+              >
+                <span className="text-base">🔔</span>
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Benachrichtigungen aktivieren</p>
+                  <p className="text-xs text-text-muted">Einstiegsfenster & Schließen-Erinnerung</p>
+                </div>
+              </button>
+            )}
             {signalsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="w-8 h-8 border-2 border-text-muted border-t-text-primary rounded-full animate-spin mb-4" />
