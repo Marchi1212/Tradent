@@ -498,19 +498,17 @@ export default function SignalCard({
           </div>
         </div>
 
-        {/* Zeile 2: Asset + Confidence auf gleicher Baseline */}
-        <div className="flex items-baseline justify-between">
-          <div>
-            <h3 className={`text-[28px] leading-none font-black ${c.text}`}>{signal.asset}</h3>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className={`text-[13px] font-medium ${c.textMut}`}>{signal.ticker}</span>
-              <CopyButton value={signal.ticker} />
-            </div>
+        {/* Zeile 2+3: Asset + Confidence */}
+        <div className="flex items-baseline justify-between mt-[10px]">
+          <h3 className={`text-[28px] leading-none font-black ${c.text}`}>{signal.asset}</h3>
+          <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
+        </div>
+        <div className="flex items-center justify-between mt-[2px]">
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[13px] font-medium ${c.textMut}`}>{signal.ticker}</span>
+            <CopyButton value={signal.ticker} />
           </div>
-          <div className="text-right">
-            <p className={`text-[28px] leading-none font-black ${c.text}`}>{signal.confidence}%</p>
-            <p className={`text-[13px] font-medium ${c.text} mt-1`}>Konfidenz</p>
-          </div>
+          <p className={`text-[13px] font-medium ${c.text}`}>Konfidenz</p>
         </div>
 
         {/* Zeile 3: Live P&L / Ergebnis / Expected Gain + Chevron */}
