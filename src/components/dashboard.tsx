@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [signals, setSignals] = useState<{ steady: Signal; bold: Signal } | null>(null);
   const [signalsLoading, setSignalsLoading] = useState(true);
   const [signalsError, setSignalsError] = useState<string | null>(null);
+  const [signalsWaitUntil, setSignalsWaitUntil] = useState<string | null>(null);
 
   async function loadPortfolio() {
     try {
@@ -57,8 +58,13 @@ export default function Dashboard() {
         throw new Error(err.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
+      if (data.waitUntil) {
+        setSignalsWaitUntil(data.waitUntil);
+        return;
+      }
       if (data.signals?.steady && data.signals?.bold) {
         setSignals(data.signals);
+        setSignalsWaitUntil(null);
       } else if (data.error) {
         throw new Error(data.error);
       }
@@ -176,6 +182,14 @@ export default function Dashboard() {
                       ? "US, Forex, Rohstoffe & Krypto werden analysiert."
                       : "55 Assets werden analysiert."}{" "}
                   Das kann bis zu 30 Sekunden dauern.
+                </p>
+              </div>
+            ) : signalsWaitUntil ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <p className="text-2xl mb-4">⏳</p>
+                <p className="text-sm font-semibold text-text-primary">Neue Signale ab {signalsWaitUntil} Uhr</p>
+                <p className="text-xs text-text-muted mt-1">
+                  Die Märkte müssen erst anlaufen, damit die Analyse zuverlässig ist.
                 </p>
               </div>
             ) : signalsError ? (
