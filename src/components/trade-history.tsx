@@ -164,43 +164,121 @@ function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: s
 }
 
 function TradeRow({ trade }: { trade: Trade }) {
+  const [expanded, setExpanded] = useState(false);
   const isOpen = trade.status === "open";
+  const isClosed = trade.status === "closed";
   const isPositive = (trade.result || 0) >= 0;
+  const pnl = trade.result || 0;
+  const pnlPercent = trade.budget > 0 ? Math.round((pnl / trade.budget) * 100 * 100) / 100 : 0;
+  const endValue = trade.budget + pnl;
 
-  const date = new Date(trade.openedAt).toLocaleDateString("de-DE", {
-    day: "numeric",
-    month: "short",
+  const openDate = new Date(trade.openedAt).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   });
+  const closeDate = trade.closedAt
+    ? new Date(trade.closedAt).toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "–";
 
   return (
-    <div className="rounded-[12px] bg-bg-card px-4 py-3.5 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-          trade.direction === "LONG"
-            ? "bg-positive/10 text-positive"
-            : "bg-negative/10 text-negative"
-        }`}>
-          {trade.direction === "LONG" ? "↑" : "↓"}
+    <div className="rounded-[12px] bg-[#1A1A1A] overflow-hidden">
+      <button
+        onClick={() => isClosed && setExpanded(!expanded)}
+        className="w-full px-4 py-3.5 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+            trade.direction === "LONG"
+              ? "bg-green-500/15 text-green-400"
+              : "bg-red-500/15 text-red-400"
+          }`}>
+            {trade.direction === "LONG" ? "↑" : "↓"}
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-bold text-white">{trade.asset}</p>
+            <p className="text-xs text-white/55">
+              {openDate} · {trade.leverage} · {trade.budget.toFixed(0)}€
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-bold text-text-primary">{trade.asset}</p>
-          <p className="text-xs text-text-muted">
-            {date} · {trade.leverage} · {trade.budget.toFixed(0)}€
-          </p>
-        </div>
-      </div>
 
-      <div className="text-right">
-        {isOpen ? (
-          <span className="inline-block rounded-full bg-accent/10 text-accent px-2.5 py-0.5 text-xs font-semibold">
-            Offen
-          </span>
-        ) : (
-          <p className={`text-sm font-bold ${isPositive ? "text-positive" : "text-negative"}`}>
-            {isPositive ? "+" : ""}{(trade.result || 0).toFixed(2)}€
-          </p>
-        )}
-      </div>
+        <div className="flex items-center gap-2">
+          {isOpen ? (
+            <span className="inline-block rounded-full bg-amber-500/15 text-amber-400 px-2.5 py-0.5 text-xs font-semibold">
+              Offen
+            </span>
+          ) : (
+            <p className={`text-sm font-bold ${isPositive ? "text-green-400" : "text-red-400"}`}>
+              {isPositive ? "+" : ""}{pnl.toFixed(2)}€
+            </p>
+          )}
+          {isClosed && (
+            <svg
+              className={`w-4 h-4 text-white/40 transition-transform ${expanded ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </div>
+      </button>
+
+      {/* Expanded Details */}
+      {expanded && isClosed && (
+        <div className="px-4 pb-4 space-y-3 border-t border-white/10 pt-3">
+          {/* Einsatz → Endwert */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Einsatz</p>
+              <p className="text-sm font-bold text-white mt-1">{trade.budget.toFixed(0)}€</p>
+            </div>
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Endwert</p>
+              <p className={`text-sm font-bold mt-1 ${isPositive ? "text-green-400" : "text-red-400"}`}>
+                {endValue.toFixed(2)}€
+              </p>
+            </div>
+          </div>
+
+          {/* P&L */}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Ergebnis</p>
+              <p className={`text-sm font-bold mt-1 ${isPositive ? "text-green-400" : "text-red-400"}`}>
+                {isPositive ? "+" : ""}{pnl.toFixed(2)}€
+              </p>
+            </div>
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Rendite</p>
+              <p className={`text-sm font-bold mt-1 ${isPositive ? "text-green-400" : "text-red-400"}`}>
+                {pnlPercent >= 0 ? "+" : ""}{pnlPercent.toFixed(1)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Zeitstempel */}
+          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Eröffnet</p>
+              <p className="text-sm font-semibold text-white mt-1">{openDate}</p>
+            </div>
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Geschlossen</p>
+              <p className="text-sm font-semibold text-white mt-1">{closeDate}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

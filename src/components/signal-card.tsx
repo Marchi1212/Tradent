@@ -571,93 +571,141 @@ export default function SignalCard({
       {/* Expanded View */}
       {expanded && (
         <div className={`px-5 pb-5 space-y-4 border-t ${c.border} pt-4`}>
-          {/* Entry / SL / TP + Volumen */}
-          <div className="grid grid-cols-3 gap-3">
-            <CopyableValue label="Einstieg" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
-            <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
-            <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
-          </div>
-          {hasPortfolio && (
-            <div className="grid grid-cols-3 gap-3">
-              <CopyableValue
-                label="Volumen (Lots)"
-                value={calculateVolume(effectiveBudget, leverage, signal.entry, signal.category)}
-                displayValue={calculateVolume(effectiveBudget, leverage, signal.entry, signal.category)}
-              />
-            </div>
-          )}
-
-          {/* Timing – Bester Einstieg nur vor Position, Markt schließt nicht bei Krypto */}
-          {(() => {
-            const showEntry = !positionOpened && !positionClosed;
-            const showClose = signal.market !== "Krypto";
-            if (!showEntry && !showClose) return null;
-            return (
-              <div className={`grid ${showEntry && showClose ? "grid-cols-2" : "grid-cols-1"} gap-3 pt-4 border-t ${c.border}`}>
-                {showEntry && (
-                  <div>
-                    <p className={`text-[13px] ${c.textMut} uppercase`}>Bester Einstieg</p>
-                    <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.optimalEntry}</p>
-                  </div>
-                )}
-                {showClose && (
-                  <div>
-                    <p className={`text-[13px] ${c.textMut} uppercase`}>Markt schließt</p>
-                    <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.marketCloseTime}</p>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Reasoning Toggle */}
-          <div className={`pt-4 border-t ${c.border}`}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowReasoning(!showReasoning);
-              }}
-              className={`text-[13px] font-medium ${c.textMut} transition-colors hover:text-white/80`}
-            >
-              {showReasoning ? "Begründung ausblenden" : "Begründung anzeigen"}
-            </button>
-            {showReasoning && (
-              <p className={`text-sm ${c.textSec} leading-relaxed mt-2`}>{signal.reasoning}</p>
-            )}
-          </div>
-
-          {/* Risk + Budget Info */}
-          {(hasPortfolio || positionOpened) && (
-            <div className={`pt-4 border-t ${c.border} space-y-1`}>
-              <div className="flex justify-between text-sm">
-                <span className={c.textSec}>Einsatz</span>
-                <span className={`font-bold ${c.text}`}>{effectiveBudget}€</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className={c.textSec}>Max. Verlust</span>
-                <span className={`font-bold ${c.text}`}>-{maxLossEuro}€</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className={c.textSec}>Max. Gewinn</span>
-                <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
-              </div>
-            </div>
-          )}
-
-          {/* Position eröffnen / schließen */}
-          {(hasPortfolio || positionOpened || positionClosed) && (
+          {positionClosed ? (
+            /* ── Geschlossene Position: kompakte Übersicht ── */
             <>
-              {positionClosed ? (
-                /* ── Position geschlossen ── */
-                <div className={`pt-4 border-t ${c.border} space-y-2`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm font-bold ${c.text}`}>Position geschlossen</span>
-                    <span className={`text-sm font-bold ${closeResult && closeResult.pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-                      {closeResult && closeResult.pnl >= 0 ? "+" : ""}{closeResult?.pnl}€
-                    </span>
+              {/* Entry → Exit */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className={`text-[13px] ${c.textMut} uppercase`}>Einstieg</p>
+                  <p className={`text-base font-bold ${c.text} mt-1`}>{(openTrade?.entry || signal.entry).toLocaleString("de-DE")}</p>
+                </div>
+                <div>
+                  <p className={`text-[13px] ${c.textMut} uppercase`}>Ausstieg</p>
+                  <p className={`text-base font-bold ${c.text} mt-1`}>{closeResult?.exitPrice ? closeResult.exitPrice.toLocaleString("de-DE") : "–"}</p>
+                </div>
+              </div>
+
+              {/* Einsatz → Endwert */}
+              <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${c.border}`}>
+                <div>
+                  <p className={`text-[13px] ${c.textMut} uppercase`}>Einsatz</p>
+                  <p className={`text-base font-bold ${c.text} mt-1`}>{effectiveBudget}€</p>
+                </div>
+                <div>
+                  <p className={`text-[13px] ${c.textMut} uppercase`}>Endwert</p>
+                  <p className={`text-base font-bold ${closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400"} mt-1`}>
+                    {closeResult ? (effectiveBudget + closeResult.pnl).toFixed(2) : effectiveBudget}€
+                  </p>
+                </div>
+              </div>
+
+              {/* Zeitstempel */}
+              <div className={`grid grid-cols-2 gap-3 pt-4 border-t ${c.border}`}>
+                <div>
+                  <p className={`text-[13px] ${c.textMut} uppercase`}>Eröffnet</p>
+                  <p className={`text-sm font-semibold ${c.text} mt-1`}>
+                    {openTrade ? new Date(openTrade.openedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–"}
+                  </p>
+                </div>
+                <div>
+                  <p className={`text-[13px] ${c.textMut} uppercase`}>Geschlossen</p>
+                  <p className={`text-sm font-semibold ${c.text} mt-1`}>
+                    {openTrade?.closedAt ? new Date(openTrade.closedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "–"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Begründung Toggle */}
+              <div className={`pt-4 border-t ${c.border}`}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowReasoning(!showReasoning); }}
+                  className={`text-[13px] font-medium ${c.textMut} transition-colors hover:text-white/80`}
+                >
+                  {showReasoning ? "Begründung ausblenden" : "Begründung anzeigen"}
+                </button>
+                {showReasoning && (
+                  <p className={`text-sm ${c.textSec} leading-relaxed mt-2`}>{signal.reasoning}</p>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ── Offene / Neue Position: volle Details ── */
+            <>
+              {/* Entry / SL / TP + Volumen */}
+              <div className="grid grid-cols-3 gap-3">
+                <CopyableValue label="Einstieg" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
+                <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
+                <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
+              </div>
+              {hasPortfolio && (
+                <div className="grid grid-cols-3 gap-3">
+                  <CopyableValue
+                    label="Volumen (Lots)"
+                    value={calculateVolume(effectiveBudget, leverage, signal.entry, signal.category)}
+                    displayValue={calculateVolume(effectiveBudget, leverage, signal.entry, signal.category)}
+                  />
+                </div>
+              )}
+
+              {/* Timing */}
+              {(() => {
+                const showEntry = !positionOpened;
+                const showClose = signal.market !== "Krypto";
+                if (!showEntry && !showClose) return null;
+                return (
+                  <div className={`grid ${showEntry && showClose ? "grid-cols-2" : "grid-cols-1"} gap-3 pt-4 border-t ${c.border}`}>
+                    {showEntry && (
+                      <div>
+                        <p className={`text-[13px] ${c.textMut} uppercase`}>Bester Einstieg</p>
+                        <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.optimalEntry}</p>
+                      </div>
+                    )}
+                    {showClose && (
+                      <div>
+                        <p className={`text-[13px] ${c.textMut} uppercase`}>Markt schließt</p>
+                        <p className={`text-sm font-semibold ${c.text} mt-1`}>{signal.marketCloseTime}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Reasoning Toggle */}
+              <div className={`pt-4 border-t ${c.border}`}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowReasoning(!showReasoning); }}
+                  className={`text-[13px] font-medium ${c.textMut} transition-colors hover:text-white/80`}
+                >
+                  {showReasoning ? "Begründung ausblenden" : "Begründung anzeigen"}
+                </button>
+                {showReasoning && (
+                  <p className={`text-sm ${c.textSec} leading-relaxed mt-2`}>{signal.reasoning}</p>
+                )}
+              </div>
+
+              {/* Risk + Budget Info */}
+              {(hasPortfolio || positionOpened) && (
+                <div className={`pt-4 border-t ${c.border} space-y-1`}>
+                  <div className="flex justify-between text-sm">
+                    <span className={c.textSec}>Einsatz</span>
+                    <span className={`font-bold ${c.text}`}>{effectiveBudget}€</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className={c.textSec}>Max. Verlust</span>
+                    <span className={`font-bold ${c.text}`}>-{maxLossEuro}€</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className={c.textSec}>Max. Gewinn</span>
+                    <span className={`font-bold ${c.text}`}>+{expectedGainEuro}€</span>
                   </div>
                 </div>
-              ) : positionOpened ? (
+              )}
+
+              {/* Position eröffnen / schließen */}
+              {(hasPortfolio || positionOpened) && (
+                <>
+                  {positionOpened ? (
                 /* ── Position aktiv ── */
                 <div className={`pt-4 border-t ${c.border} space-y-3`}>
                   {closing ? (
@@ -823,6 +871,8 @@ export default function SignalCard({
                           : "Markt geschlossen"}
                   </button>
                 </div>
+              )}
+                </>
               )}
             </>
           )}
