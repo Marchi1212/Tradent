@@ -134,14 +134,7 @@ export default function Dashboard() {
           {portfolio ? (
             <>
               <div className="flex items-center gap-3">
-                {/* Verfügbar */}
-                <div className="flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
-                  </svg>
-                  <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
-                </div>
-                {/* Investiert */}
+                <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
                 {invested > 0 && (
                   <div className="flex items-center gap-1">
                     <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -177,14 +170,7 @@ export default function Dashboard() {
         <div className="flex md:hidden items-center gap-3">
           {portfolio && (
             <div className="flex items-center gap-2.5">
-              {/* Verfügbar */}
-              <div className="flex items-center gap-1">
-                <svg className="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" />
-                </svg>
-                <span className="text-lg font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
-              </div>
-              {/* Investiert */}
+              <span className="text-lg font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
               {invested > 0 && (
                 <div className="flex items-center gap-1">
                   <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
