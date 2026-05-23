@@ -103,6 +103,12 @@ export default function SignalCard({
 
   // Prüfen ob schon ein Trade für dieses Signal existiert (offen oder geschlossen)
   useEffect(() => {
+    // State resetten wenn Portfolio wechselt oder weg ist
+    setPositionOpened(false);
+    setPositionClosed(false);
+    setOpenTrade(null);
+    setCloseResult(null);
+
     if (!portfolio) return;
     getTradeForSignal(portfolio.id, signal.id)
       .then((trade) => {

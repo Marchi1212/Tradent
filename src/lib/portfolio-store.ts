@@ -363,6 +363,16 @@ export async function closeTrade(
 
 export async function deletePortfolio(id: string): Promise<void> {
   const supabase = createClient();
+
+  // Zuerst alle zugehörigen Trades löschen (keine Geister-Trades)
+  const { error: tradesError } = await supabase
+    .from("trades")
+    .delete()
+    .eq("portfolio_id", id);
+
+  if (tradesError) throw tradesError;
+
+  // Dann Portfolio löschen
   const { error } = await supabase
     .from("portfolios")
     .delete()
