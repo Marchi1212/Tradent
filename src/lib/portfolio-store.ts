@@ -63,6 +63,38 @@ function toTrade(row: Record<string, unknown>): Trade {
   };
 }
 
+// Balance aus Original-Budget + Trades korrekt berechnen (idempotent)
+async function reconcileBalance(portfolioId: string, originalBudget: number): Promise<number | null> {
+  const supabase = createClient();
+
+  const { data: trades, error } = await supabase
+    .from("trades")
+    .select("budget, result, status")
+    .eq("portfolio_id", portfolioId);
+
+  if (error || !trades) return null;
+
+  let balance = originalBudget;
+
+  for (const trade of trades) {
+    if (trade.status === "open") {
+      // Offene Position: Budget ist gebunden
+      balance -= Number(trade.budget);
+    } else if (trade.status === "closed") {
+      // Geschlossene Position: nur P&L zählt (Budget bereits zurück)
+      balance += Number(trade.result || 0);
+    }
+  }
+
+  // In DB korrigieren wenn nötig
+  await supabase
+    .from("portfolios")
+    .update({ current_balance: balance })
+    .eq("id", portfolioId);
+
+  return balance;
+}
+
 async function getUserId(): Promise<string> {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -91,7 +123,17 @@ export async function getActivePortfolio(): Promise<Portfolio | null> {
     .maybeSingle();
 
   if (error) throw error;
-  return data ? toPortfolio(data) : null;
+  if (!data) return null;
+
+  const portfolio = toPortfolio(data);
+
+  // Balance-Reconciliation: immer korrekt berechnen
+  const correctBalance = await reconcileBalance(portfolio.id, portfolio.budget);
+  if (correctBalance !== null && Math.abs(correctBalance - portfolio.currentBalance) > 0.01) {
+    portfolio.currentBalance = correctBalance;
+  }
+
+  return portfolio;
 }
 
 export async function setActivePortfolio(id: string): Promise<void> {
