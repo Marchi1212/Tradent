@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
-import { getActivePortfolio, allocateCapital, type Portfolio } from "@/lib/portfolio-store";
+import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
@@ -49,6 +49,7 @@ export default function Dashboard() {
   const [signalsError, setSignalsError] = useState<string | null>(null);
   const [signalsWaitUntil, setSignalsWaitUntil] = useState<string | null>(null);
   const [notifState, setNotifState] = useState<"unknown" | "granted" | "denied" | "prompt" | "unsupported">("unknown");
+  const [openTradeSignals, setOpenTradeSignals] = useState<Set<string>>(new Set());
 
   async function loadPortfolio() {
     try {
@@ -102,6 +103,20 @@ export default function Dashboard() {
       else setNotifState("prompt"); // "default" → show prompt
     });
   }, []);
+
+  // Offene Trades prüfen (damit Karten trotz niedriger Konfidenz sichtbar bleiben)
+  useEffect(() => {
+    if (!signals || !portfolio) return;
+    async function checkOpenTrades() {
+      const openIds = new Set<string>();
+      for (const s of [signals!.steady, signals!.bold]) {
+        const trade = await getOpenTradeForSignal(portfolio!.id, s.id);
+        if (trade) openIds.add(s.id);
+      }
+      setOpenTradeSignals(openIds);
+    }
+    checkOpenTrades();
+  }, [signals, portfolio]);
 
   // Entry-Notifications schedulen sobald Signale geladen sind
   useEffect(() => {
@@ -282,7 +297,7 @@ export default function Dashboard() {
               </div>
             ) : signals ? (
               <div className="space-y-4">
-                {signals.steady.confidence >= 70 ? (
+                {signals.steady.confidence >= 70 || openTradeSignals.has(signals.steady.id) ? (
                   <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={loadPortfolio} />
                 ) : (
                   <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
@@ -290,7 +305,7 @@ export default function Dashboard() {
                     <p className="text-xs text-text-muted mt-1">Konfidenz zu niedrig ({signals.steady.confidence}%). Mindestens 70% nötig.</p>
                   </div>
                 )}
-                {signals.bold.confidence >= 50 ? (
+                {signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id) ? (
                   <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={loadPortfolio} />
                 ) : (
                   <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
