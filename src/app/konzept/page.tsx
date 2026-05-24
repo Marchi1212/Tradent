@@ -47,9 +47,9 @@ export default async function DocsPage() {
         </div>
 
 
-        {/* 1. Das Prinzip */}
+        {/* 1. Grundlagen */}
         <section className="space-y-4">
-          <h2 className="text-2xl font-black text-text-primary">1. Das Prinzip</h2>
+          <h2 className="text-2xl font-black text-text-primary">1. Grundlagen</h2>
           <p className="text-text-secondary leading-relaxed">
             Tradent liefert jeden Morgen genau zwei Trading-Signale: ein konservatives <strong>Steady-Signal</strong> und ein offensiveres <strong>Bold-Signal</strong>. Die App richtet sich an Daytrader, die auf CFD-Basis ueber den Broker XTB handeln. Der zentrale Gedanke: weniger ist mehr.
           </p>
