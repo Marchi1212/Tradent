@@ -25,12 +25,9 @@ export default async function DocsPage() {
         <a href="/" className="flex items-center gap-2">
           <img src="/logo.svg" alt="Tradent" className="h-4 shrink-0" />
         </a>
-        <button
-          onClick={() => {}}
-          className="text-sm font-semibold text-text-muted hover:text-text-primary transition-colors"
-        >
-          <a href="/">Zurueck zur App</a>
-        </button>
+        <a href="/" className="text-sm font-semibold text-text-muted hover:text-text-primary transition-colors">
+          Zurück zur App
+        </a>
       </header>
 
       <main className="docs-content max-w-2xl mx-auto px-5 py-12 space-y-16">
