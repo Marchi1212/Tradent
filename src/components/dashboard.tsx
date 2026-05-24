@@ -282,8 +282,22 @@ export default function Dashboard() {
               </div>
             ) : signals ? (
               <div className="space-y-4">
-                <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={loadPortfolio} />
-                <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={loadPortfolio} />
+                {signals.steady.confidence >= 70 ? (
+                  <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={loadPortfolio} />
+                ) : (
+                  <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
+                    <p className="text-sm font-semibold text-text-primary">Kein Steady-Signal heute</p>
+                    <p className="text-xs text-text-muted mt-1">Konfidenz zu niedrig ({signals.steady.confidence}%). Mindestens 70% nötig.</p>
+                  </div>
+                )}
+                {signals.bold.confidence >= 50 ? (
+                  <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={loadPortfolio} />
+                ) : (
+                  <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
+                    <p className="text-sm font-semibold text-text-primary">Kein Bold-Signal heute</p>
+                    <p className="text-xs text-text-muted mt-1">Konfidenz zu niedrig ({signals.bold.confidence}%). Mindestens 50% nötig.</p>
+                  </div>
+                )}
               </div>
             ) : null}
           </>
