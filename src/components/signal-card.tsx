@@ -128,6 +128,7 @@ export default function SignalCard({
     pnl: number;
     pnlPercent: number;
   } | null>(null);
+  const [refreshingPrice, setRefreshingPrice] = useState(false);
 
   // Prüfen ob schon ein Trade für dieses Signal existiert (offen oder geschlossen)
   useEffect(() => {
@@ -360,6 +361,35 @@ export default function SignalCard({
   function handleCancelRevalidation() {
     setRevalidation(null);
     setRevalError(null);
+  }
+
+  // Manueller Kurs-Refresh
+  async function handleRefreshPrice() {
+    if (!openTrade) return;
+    try {
+      setRefreshingPrice(true);
+      const res = await fetch(`/api/price?ticker=${encodeURIComponent(signal.ticker)}`);
+      if (!res.ok) return;
+      const { price } = await res.json();
+      if (!price) return;
+
+      const lev = parseFloat(signal.leverage);
+      const liveSpreadCost = (SPREAD_PERCENT[signal.category] || 0.05) * lev;
+      const liveDiff = openTrade.direction === "LONG"
+        ? price - openTrade.entry
+        : openTrade.entry - price;
+      const livePnlPct = (liveDiff / openTrade.entry) * 100 * lev - liveSpreadCost;
+      const livePnlEur = Math.round(openTrade.budget * (livePnlPct / 100) * 100) / 100;
+      setLivePnl({
+        currentPrice: price,
+        pnl: livePnlEur,
+        pnlPercent: Math.round(livePnlPct * 100) / 100,
+      });
+    } catch {
+      // Stille Fehlerbehandlung
+    } finally {
+      setRefreshingPrice(false);
+    }
   }
 
   // Position schließen: aktuellen Kurs holen + P&L berechnen
@@ -633,12 +663,41 @@ export default function SignalCard({
           ) : (
             /* ── Offene / Neue Position: volle Details ── */
             <>
-              {/* Entry / SL / TP + Volumen */}
-              <div className="grid grid-cols-3 gap-3">
-                <CopyableValue label="Einstieg" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
-                <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
-                <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
-              </div>
+              {/* Entry / Aktuell / SL / TP */}
+              {positionOpened ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CopyableValue label="Einstieg" value={String(openTrade?.entry || signal.entry)} displayValue={(openTrade?.entry || signal.entry).toLocaleString("de-DE")} />
+                    <div>
+                      <p className="text-[13px] text-white/55 uppercase">Aktuell</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <p className="text-base font-bold text-white">
+                          {livePnl ? livePnl.currentPrice.toLocaleString("de-DE") : "–"}
+                        </p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRefreshPrice(); }}
+                          disabled={refreshingPrice}
+                          className="inline-flex items-center shrink-0"
+                        >
+                          <svg className={`w-3.5 h-3.5 text-white/55 hover:text-white/80 transition-colors ${refreshingPrice ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.992 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M21.015 4.355v4.992" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
+                    <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <CopyableValue label="Einstieg" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
+                  <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
+                  <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
+                </div>
+              )}
               {hasPortfolio && (
                 <div className="grid grid-cols-3 gap-3">
                   <CopyableValue
