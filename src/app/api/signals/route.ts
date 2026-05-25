@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTodaySignals, saveTodaySignals, todaySignalsExist } from "@/lib/signal-store";
 import { generateSignals } from "@/lib/signal-generator";
+import { getTradingDayType } from "@/lib/market-hours";
 
 export const maxDuration = 60;
 
@@ -17,12 +18,15 @@ export async function GET() {
     const cetStr = now.toLocaleString("en-US", { timeZone: "Europe/Berlin" });
     const cet = new Date(cetStr);
     const currentMinutes = cet.getHours() * 60 + cet.getMinutes();
-    const day = cet.getDay();
-    const isWeekendDay = day === 0 || day === 6;
-    const minMinutes = isWeekendDay ? 8 * 60 : 9 * 60 + 15; // WE: 08:00, Werktag: 09:15
+    const dayType = getTradingDayType(cet);
+    const isWeekendDay = dayType === "weekend";
+    // WE: 08:00, Feiertage: 08:30 (weniger Märkte, schneller bereit), Werktag: 09:15
+    const minMinutes = isWeekendDay ? 8 * 60
+      : dayType === "weekday" ? 9 * 60 + 15
+      : 8 * 60 + 30;
 
     if (currentMinutes < minMinutes) {
-      const waitUntil = isWeekendDay ? "08:00" : "09:15";
+      const waitUntil = isWeekendDay ? "08:00" : dayType === "weekday" ? "09:15" : "08:30";
       return NextResponse.json({ waitUntil, isWeekend: isWeekendDay });
     }
 

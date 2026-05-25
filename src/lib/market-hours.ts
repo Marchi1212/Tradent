@@ -71,14 +71,91 @@ function getGermanHolidays(year: number): Set<string> {
   return new Set(holidays.map(dateKey));
 }
 
-export type TradingDayType = "weekday" | "weekend" | "german_holiday";
+// US-Börsenfeiertage (NYSE/NASDAQ geschlossen)
+function getUSHolidays(year: number): Set<string> {
+  const holidays: Date[] = [];
+
+  // Neujahr (1. Jan, bei Sa → Fr davor, bei So → Mo danach)
+  let ny = new Date(year, 0, 1);
+  if (ny.getDay() === 6) ny = new Date(year - 1, 11, 31);
+  if (ny.getDay() === 0) ny = new Date(year, 0, 2);
+  holidays.push(ny);
+
+  // MLK Day (3. Montag im Januar)
+  holidays.push(nthWeekday(year, 0, 1, 3));
+
+  // Presidents' Day (3. Montag im Februar)
+  holidays.push(nthWeekday(year, 1, 1, 3));
+
+  // Good Friday (Karfreitag – 2 Tage vor Ostersonntag)
+  holidays.push(addDays(easterSunday(year), -2));
+
+  // Memorial Day (letzter Montag im Mai)
+  holidays.push(lastWeekday(year, 4, 1));
+
+  // Juneteenth (19. Juni, bei Sa → Fr, bei So → Mo)
+  holidays.push(observedDate(new Date(year, 5, 19)));
+
+  // Independence Day (4. Juli, bei Sa → Fr, bei So → Mo)
+  holidays.push(observedDate(new Date(year, 6, 4)));
+
+  // Labor Day (1. Montag im September)
+  holidays.push(nthWeekday(year, 8, 1, 1));
+
+  // Thanksgiving (4. Donnerstag im November)
+  holidays.push(nthWeekday(year, 10, 4, 4));
+
+  // Christmas (25. Dez, bei Sa → Fr, bei So → Mo)
+  holidays.push(observedDate(new Date(year, 11, 25)));
+
+  return new Set(holidays.map(dateKey));
+}
+
+// N-ter Wochentag im Monat (z.B. 3. Montag im Januar)
+function nthWeekday(year: number, month: number, weekday: number, n: number): Date {
+  const first = new Date(year, month, 1);
+  let dayOfWeek = first.getDay();
+  let diff = weekday - dayOfWeek;
+  if (diff < 0) diff += 7;
+  return new Date(year, month, 1 + diff + (n - 1) * 7);
+}
+
+// Letzter Wochentag im Monat (z.B. letzter Montag im Mai)
+function lastWeekday(year: number, month: number, weekday: number): Date {
+  const last = new Date(year, month + 1, 0); // Letzter Tag des Monats
+  let diff = last.getDay() - weekday;
+  if (diff < 0) diff += 7;
+  return new Date(year, month + 1, -diff);
+}
+
+// Observed Date: Sa → Fr davor, So → Mo danach
+function observedDate(d: Date): Date {
+  if (d.getDay() === 6) return addDays(d, -1);
+  if (d.getDay() === 0) return addDays(d, 1);
+  return d;
+}
+
+export type TradingDayType = "weekday" | "weekend" | "german_holiday" | "double_holiday" | "us_holiday";
 
 export function getTradingDayType(date: Date = new Date()): TradingDayType {
   const day = date.getDay(); // 0=So, 6=Sa
   if (day === 0 || day === 6) return "weekend";
-  const holidays = getGermanHolidays(date.getFullYear());
-  if (holidays.has(dateKey(date))) return "german_holiday";
+
+  const deHolidays = getGermanHolidays(date.getFullYear());
+  const usHolidays = getUSHolidays(date.getFullYear());
+  const key = dateKey(date);
+  const isDE = deHolidays.has(key);
+  const isUS = usHolidays.has(key);
+
+  if (isDE && isUS) return "double_holiday";
+  if (isDE) return "german_holiday";
+  if (isUS) return "us_holiday";
   return "weekday";
+}
+
+export function isUSHoliday(date: Date = new Date()): boolean {
+  const usHolidays = getUSHolidays(date.getFullYear());
+  return usHolidays.has(dateKey(date));
 }
 
 export function isWeekend(date: Date = new Date()): boolean {

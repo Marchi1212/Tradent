@@ -189,6 +189,18 @@ export async function fetchNonXetraMarketData(): Promise<AssetMarketData[]> {
   return fetchAssetBatch(nonXetra);
 }
 
+// Nur Forex + Rohstoffe + Krypto (für Doppel-Feiertage: EU + US geschlossen)
+export async function fetchGlobalMarketData(): Promise<AssetMarketData[]> {
+  const global = WATCHLIST.filter((a) => ["Forex", "COMEX", "NYMEX", "Krypto"].includes(a.market));
+  return fetchAssetBatch(global);
+}
+
+// Alle Assets OHNE US laden (für US-Feiertage: EU/Forex/Rohstoffe/Crypto offen)
+export async function fetchNonUSMarketData(): Promise<AssetMarketData[]> {
+  const nonUS = WATCHLIST.filter((a) => !["NYSE", "NYSE_STOCK"].includes(a.market));
+  return fetchAssetBatch(nonUS);
+}
+
 // Generische Batch-Loader-Funktion
 async function fetchAssetBatch(assets: WatchlistAsset[]): Promise<AssetMarketData[]> {
   const results: AssetMarketData[] = [];
