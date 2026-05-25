@@ -456,32 +456,6 @@ export default function SignalCard({
 
   return (
     <div className={`rounded-[12px] ${c.bg} overflow-hidden`}>
-      {/* Position aktiv: Countdown-Balken */}
-      {positionOpened && marketInfo.closeSeconds !== null && (
-        <div className="px-5 pt-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className={`text-[13px] font-bold ${c.text}`}>Position läuft</span>
-            <span className={`text-[13px] font-medium ${c.timerText}`}>
-              schließt in {formatTimer(marketInfo.closeSeconds)}
-            </span>
-          </div>
-          <div className="w-full h-1.5 rounded-full bg-white/10">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                marketInfo.closeSeconds < 3600
-                  ? "bg-red-500"
-                  : marketInfo.closeSeconds < 7200
-                    ? "bg-amber-500"
-                    : "bg-white"
-              }`}
-              style={{
-                width: `${Math.max(2, (marketInfo.closeSeconds / marketInfo.totalTradingSeconds) * 100)}%`,
-              }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -531,6 +505,29 @@ export default function SignalCard({
             </span>
           </div>
         </div>
+
+        {/* Position aktiv: Countdown-Balken mit integrierter Zeit */}
+        {positionOpened && marketInfo.closeSeconds !== null && (
+          <div className="mt-2 relative">
+            <div className="w-full h-1.5 rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ${
+                  marketInfo.closeSeconds < 3600
+                    ? "bg-red-500"
+                    : marketInfo.closeSeconds < 7200
+                      ? "bg-amber-500"
+                      : "bg-white"
+                }`}
+                style={{
+                  width: `${Math.max(2, (marketInfo.closeSeconds / marketInfo.totalTradingSeconds) * 100)}%`,
+                }}
+              />
+            </div>
+            <p className={`text-[11px] ${c.timerText} mt-1 text-right`}>
+              schließt in {formatTimer(marketInfo.closeSeconds)}
+            </p>
+          </div>
+        )}
 
         {/* Zeile 2+3: Asset + Confidence */}
         <div className="flex items-baseline justify-between mt-[10px]">
