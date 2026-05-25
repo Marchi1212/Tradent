@@ -466,25 +466,30 @@ async function perplexityCheck(signal: GeneratedSignal): Promise<PerplexityResul
         messages: [
           {
             role: "system",
-            content: `Du bist ein Finanz-News-Filter. Deine EINZIGE Aufgabe: Prüfe ob es in den letzten 24 Stunden eine KONKRETE, UNERWARTETE Nachricht gibt, die diesen spezifischen Trade direkt gefährdet.
+            content: `Du bist ein Finanz-News-Filter. Deine EINZIGE Aufgabe: Prüfe ob es in den letzten 24 Stunden eine KONKRETE, UNERWARTETE Nachricht gibt, die GEGEN die geplante Trade-Richtung spricht.
 
-WARNUNG NUR bei konkreten, heutigen Events wie:
-- Überraschende Gewinnwarnung oder Bilanzskandal (bei Aktien)
-- Plötzliche Regulierungsmaßnahme die dieses Asset direkt betrifft
-- Unerwarteter Flash-Crash oder Handelsaussetzung
-- Überraschende Zentralbank-Notfallsitzung
-- Unternehmensspezifischer Skandal (Betrug, CEO-Rücktritt, etc.)
+WICHTIG — Richtung beachten:
+- Bei einem LONG-Trade: Nur NEGATIVE Überraschungsnachrichten sind ein Risiko
+- Bei einem SHORT-Trade: Nur POSITIVE Überraschungsnachrichten sind ein Risiko
+- Nachrichten die die Trade-Richtung BESTÄTIGEN sind KEIN Risiko (→ approved=true)
+
+WARNUNG NUR bei konkreten, heutigen Events die GEGEN die Richtung sprechen:
+- Überraschende Gewinnwarnung/Bilanzskandal bei einem LONG-Trade
+- Überraschend positive Zahlen/Deals bei einem SHORT-Trade
+- Plötzliche Regulierung die den Kurs GEGEN unsere Richtung treibt
+- Unerwarteter Flash-Crash (bei LONG) oder Short-Squeeze (bei SHORT)
+- Überraschende Zentralbank-Entscheidung GEGEN unsere Richtung
 
 KEIN Grund für eine Warnung (MUSS approved=true sein):
 - Allgemeine Marktvolatilität oder -unsicherheit
 - Laufende geopolitische Spannungen (Kriege, Handelskonflikte)
 - Bekannte Inflationsdaten oder Zinserwartungen
 - Allgemeines Sentiment (Fear & Greed, Risk-off-Stimmung)
-- Technische Schwäche oder Momentum-Verlust (ist bereits in der Analyse)
+- Technische Schwäche oder Momentum-Verlust (bereits in der Analyse)
 - Liquidationsrisiken bei Krypto (sind normal)
-- Generelle Aussagen wie "Markt ist unsicher"
+- Nachrichten die unsere Trade-Richtung UNTERSTÜTZEN
 
-Im Zweifel: approved=true. Der technische Analyst hat diese Faktoren bereits berücksichtigt. Du suchst NUR nach Überraschungen die noch NICHT im Kurs eingepreist sind.
+Im Zweifel: approved=true. Der technische Analyst hat allgemeine Faktoren bereits berücksichtigt. Du suchst NUR nach Überraschungen die GEGEN unsere Position sprechen und noch NICHT im Kurs eingepreist sind.
 
 Antworte NUR mit JSON:
 {
@@ -495,13 +500,14 @@ Antworte NUR mit JSON:
           },
           {
             role: "user",
-            content: `Gibt es in den letzten 24h eine KONKRETE, ÜBERRASCHENDE Nachricht die diesen Trade direkt gefährdet?
+            content: `Gibt es in den letzten 24h eine KONKRETE, ÜBERRASCHENDE Nachricht die GEGEN diesen Trade spricht?
 
 Asset: ${signal.asset} (${signal.ticker})
-Richtung: ${signal.direction}
+Richtung: ${signal.direction} (d.h. wir setzen auf ${signal.direction === "LONG" ? "steigende" : "fallende"} Kurse)
 Kategorie: ${signal.category}
 
-Antworte mit approved=true wenn du KEINE konkrete Überraschungsnachricht findest. Allgemeine Marktlage ist KEIN Grund für eine Warnung.`,
+Nachrichten die ${signal.direction === "LONG" ? "steigende" : "fallende"} Kurse BESTÄTIGEN sind KEIN Risiko.
+Antworte mit approved=true wenn du nichts findest das GEGEN unsere Richtung spricht.`,
           },
         ],
         max_tokens: 300,
