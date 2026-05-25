@@ -456,6 +456,35 @@ export default function SignalCard({
 
   return (
     <div className={`rounded-[12px] ${c.bg} overflow-hidden`}>
+      {/* Position aktiv: Laufzeit-Header mit Balken */}
+      {positionOpened && marketInfo.closeSeconds !== null && (
+        <div className="px-5 pt-4 pb-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className={`text-[13px] font-medium ${c.timerText}`}>
+              schließt in {formatTimer(marketInfo.closeSeconds)}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full shrink-0 bg-amber-400" />
+              <span className="text-[13px] font-medium text-amber-400">Position läuft</span>
+            </div>
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-white/10">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                marketInfo.closeSeconds < 3600
+                  ? "bg-red-500"
+                  : marketInfo.closeSeconds < 7200
+                    ? "bg-amber-500"
+                    : "bg-white"
+              }`}
+              style={{
+                width: `${Math.max(2, (marketInfo.closeSeconds / marketInfo.totalTradingSeconds) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Collapsed View */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -466,12 +495,12 @@ export default function SignalCard({
           <p className={`text-sm font-bold ${c.text}`}>
             {signal.direction} · {signal.category} · {signal.leverage}
           </p>
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${
-              positionClosed
-                ? (closeResult && closeResult.pnl >= 0 ? "bg-green-400" : "bg-red-400")
-                : positionOpened
-                  ? "bg-amber-400"
+          {/* Status-Tag: nur wenn KEINE offene Position (sonst oben im Balken-Header) */}
+          {!positionOpened && (
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
+                positionClosed
+                  ? (closeResult && closeResult.pnl >= 0 ? "bg-green-400" : "bg-red-400")
                   : signalInvalid
                     ? "bg-red-400"
                     : marketInfo.marketPhase === "post_close"
@@ -481,20 +510,16 @@ export default function SignalCard({
                         : marketInfo.marketPhase === "closing_soon"
                           ? "bg-amber-400"
                           : "bg-blue-400"
-            }`} />
-            <span className={`text-[13px] font-medium ${
-              positionClosed
-                ? (closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400")
-                : positionOpened
-                  ? "text-amber-400"
+              }`} />
+              <span className={`text-[13px] font-medium ${
+                positionClosed
+                  ? (closeResult && closeResult.pnl >= 0 ? "text-green-400" : "text-red-400")
                   : signalInvalid
                     ? "text-red-400"
                     : c.timerText
-            }`}>
-              {positionClosed
-                ? (closeResult ? `${closeResult.pnl >= 0 ? "+" : ""}${closeResult.pnl}€` : "Abgeschlossen")
-                : positionOpened
-                  ? "Position läuft"
+              }`}>
+                {positionClosed
+                  ? (closeResult ? `${closeResult.pnl >= 0 ? "+" : ""}${closeResult.pnl}€` : "Abgeschlossen")
                   : signalInvalid
                     ? "Signal ungültig"
                     : marketInfo.marketPhase === "post_close"
@@ -502,32 +527,10 @@ export default function SignalCard({
                       : marketInfo.timerSeconds !== null
                         ? `${marketInfo.timerLabel} ${formatTimer(marketInfo.timerSeconds)}`
                         : marketInfo.timerLabel}
-            </span>
-          </div>
-        </div>
-
-        {/* Position aktiv: Countdown-Balken mit integrierter Zeit */}
-        {positionOpened && marketInfo.closeSeconds !== null && (
-          <div className="mt-2 relative">
-            <div className="w-full h-1.5 rounded-full bg-white/10">
-              <div
-                className={`h-full rounded-full transition-all duration-1000 ${
-                  marketInfo.closeSeconds < 3600
-                    ? "bg-red-500"
-                    : marketInfo.closeSeconds < 7200
-                      ? "bg-amber-500"
-                      : "bg-white"
-                }`}
-                style={{
-                  width: `${Math.max(2, (marketInfo.closeSeconds / marketInfo.totalTradingSeconds) * 100)}%`,
-                }}
-              />
+              </span>
             </div>
-            <p className={`text-[11px] ${c.timerText} mt-1 text-right`}>
-              schließt in {formatTimer(marketInfo.closeSeconds)}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Zeile 2+3: Asset + Confidence */}
         <div className="flex items-baseline justify-between mt-[10px]">
