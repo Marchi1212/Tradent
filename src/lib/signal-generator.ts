@@ -466,27 +466,42 @@ async function perplexityCheck(signal: GeneratedSignal): Promise<PerplexityResul
         messages: [
           {
             role: "system",
-            content: `Du bist ein Finanz-News-Analyst. Prüfe ob es aktuelle Nachrichten gibt die einen geplanten Trade gefährden könnten. Suche nach: Gewinnwarnungen, regulatorische Probleme, geopolitische Risiken, unerwartete Ereignisse.
+            content: `Du bist ein Finanz-News-Filter. Deine EINZIGE Aufgabe: Prüfe ob es in den letzten 24 Stunden eine KONKRETE, UNERWARTETE Nachricht gibt, die diesen spezifischen Trade direkt gefährdet.
+
+WARNUNG NUR bei konkreten, heutigen Events wie:
+- Überraschende Gewinnwarnung oder Bilanzskandal (bei Aktien)
+- Plötzliche Regulierungsmaßnahme die dieses Asset direkt betrifft
+- Unerwarteter Flash-Crash oder Handelsaussetzung
+- Überraschende Zentralbank-Notfallsitzung
+- Unternehmensspezifischer Skandal (Betrug, CEO-Rücktritt, etc.)
+
+KEIN Grund für eine Warnung (MUSS approved=true sein):
+- Allgemeine Marktvolatilität oder -unsicherheit
+- Laufende geopolitische Spannungen (Kriege, Handelskonflikte)
+- Bekannte Inflationsdaten oder Zinserwartungen
+- Allgemeines Sentiment (Fear & Greed, Risk-off-Stimmung)
+- Technische Schwäche oder Momentum-Verlust (ist bereits in der Analyse)
+- Liquidationsrisiken bei Krypto (sind normal)
+- Generelle Aussagen wie "Markt ist unsicher"
+
+Im Zweifel: approved=true. Der technische Analyst hat diese Faktoren bereits berücksichtigt. Du suchst NUR nach Überraschungen die noch NICHT im Kurs eingepreist sind.
 
 Antworte NUR mit JSON:
 {
   "approved": true/false,
   "confidenceReduction": 0-30,
-  "reason": "Kurze Begründung auf Deutsch"
-}
-
-approved=true wenn keine negativen News gefunden.
-approved=false + confidenceReduction wenn Risiken bestehen (10=leicht, 20=mittel, 30=schwer).`,
+  "reason": "Kurze Begründung auf Deutsch (max 1 Satz)"
+}`,
           },
           {
             role: "user",
-            content: `Prüfe diesen Trade auf aktuelle Risiken:
-- Asset: ${signal.asset} (${signal.ticker})
-- Richtung: ${signal.direction}
-- Kategorie: ${signal.category}
-- Markt: ${signal.market}
+            content: `Gibt es in den letzten 24h eine KONKRETE, ÜBERRASCHENDE Nachricht die diesen Trade direkt gefährdet?
 
-Gibt es heute aktuelle Nachrichten die diesen ${signal.direction}-Trade auf ${signal.asset} gefährden könnten?`,
+Asset: ${signal.asset} (${signal.ticker})
+Richtung: ${signal.direction}
+Kategorie: ${signal.category}
+
+Antworte mit approved=true wenn du KEINE konkrete Überraschungsnachricht findest. Allgemeine Marktlage ist KEIN Grund für eine Warnung.`,
           },
         ],
         max_tokens: 300,
