@@ -118,10 +118,10 @@ export default async function DocsPage() {
           <div className="bg-bg-secondary rounded-[12px] p-5 space-y-4">
             <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">Stufe 4 &mdash; Gegencheck (Qualitaetsfilter)</h3>
             <p className="text-sm text-text-secondary leading-relaxed">
-              Nachdem die Analyse ein Signal generiert hat, wird es einem unabhaengigen Gegencheck unterzogen. Dieser prueft aktuelle Nachrichten und Marktentwicklungen auf potenzielle Risiken, die in den Marktdaten noch nicht eingepreist sind &mdash; z.B. ueberraschende Regulierungsmassnahmen, Unternehmens-Skandale oder geopolitische Entwicklungen.
+              Nachdem die Analyse ein Signal generiert hat, wird es einem unabhaengigen Gegencheck unterzogen. Dieser prueft aktuelle Nachrichten auf konkrete, ueberraschende Ereignisse der letzten 24 Stunden &mdash; z.B. ueberraschende Regulierungsmassnahmen, Unternehmens-Skandale oder Flash-Crashes.
             </p>
             <p className="text-sm text-text-secondary leading-relaxed">
-              Das Ergebnis ist entweder eine Bestaetigung, eine Warnung (Konfidenz wird reduziert) oder eine Ablehnung (naechstbestes Asset wird gewaehlt). Dieser Schritt verhindert, dass rein technische Signale in eine Nachrichtenlage hinein gehandelt werden.
+              Entscheidend: Der Gegencheck ist richtungsabhaengig. Bei einem SHORT-Trade sind negative Nachrichten kein Risiko, sondern eine Bestaetigung. Nur Nachrichten die <strong>gegen</strong> die geplante Trade-Richtung sprechen, fuehren zu einer Warnung. Allgemeine Marktlage, laufende Konflikte oder bekannte Wirtschaftsdaten werden bewusst ignoriert &mdash; sie sind bereits in der technischen Analyse eingepreist.
             </p>
           </div>
 
@@ -191,10 +191,12 @@ export default async function DocsPage() {
 
           <div className="bg-bg-secondary rounded-[12px] p-5 space-y-3">
             <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">Marktmodi</h3>
-            <ul className="space-y-1 text-sm text-text-secondary">
+            <ul className="space-y-2 text-sm text-text-secondary">
               <li><strong>Wochentag:</strong> Alle 55 Assets werden analysiert</li>
               <li><strong>Wochenende:</strong> Nur 12 Krypto-Assets (einziger 24/7-Markt)</li>
-              <li><strong>Feiertag:</strong> Ohne europaeische Boersen, US/Forex/Rohstoffe/Krypto bleiben verfuegbar</li>
+              <li><strong>DE-Feiertag:</strong> Ohne XETRA/EU &mdash; US, Forex, Rohstoffe und Krypto bleiben verfuegbar</li>
+              <li><strong>US-Feiertag:</strong> Ohne NYSE/NASDAQ &mdash; EU, Forex, Rohstoffe und Krypto bleiben verfuegbar</li>
+              <li><strong>Doppel-Feiertag:</strong> Wenn EU und US gleichzeitig geschlossen sind (z.B. Pfingstmontag + Memorial Day) &mdash; nur Forex, Rohstoffe und Krypto (26 Assets)</li>
             </ul>
           </div>
         </section>
