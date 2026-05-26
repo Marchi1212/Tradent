@@ -91,7 +91,7 @@ Regeln:
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist ein deutscher Feiertag – XETRA und europäische Börsen sind geschlossen. US-Märkte, Forex, Rohstoffe und Krypto sind aber handelbar. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
+const SYSTEM_PROMPT_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist ein XETRA-Börsen-Feiertag – XETRA und europäische Börsen sind geschlossen. US-Märkte, Forex, Rohstoffe und Krypto sind aber handelbar. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
 
 ANALYSE-HIERARCHIE (Gewichtung):
 1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
@@ -118,7 +118,7 @@ Regeln:
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist sowohl ein deutscher als auch ein US-Feiertag – XETRA, europäische UND US-Börsen sind geschlossen. Handelbar sind nur Forex, Rohstoffe und Krypto. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
+const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute haben sowohl XETRA als auch NYSE geschlossen – europäische UND US-Börsen sind zu. Handelbar sind nur Forex, Rohstoffe und Krypto. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
 
 ANALYSE-HIERARCHIE (Gewichtung):
 1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
@@ -175,8 +175,8 @@ Antworte ausschließlich mit JSON, kein anderer Text.`;
 function getSystemPrompt(dayType: TradingDayType): string {
   if (dayType === "weekend") return SYSTEM_PROMPT_WEEKEND;
   if (dayType === "double_holiday") return SYSTEM_PROMPT_DOUBLE_HOLIDAY;
-  if (dayType === "german_holiday") return SYSTEM_PROMPT_HOLIDAY;
-  if (dayType === "us_holiday") return SYSTEM_PROMPT_US_HOLIDAY;
+  if (dayType === "xetra_closed") return SYSTEM_PROMPT_HOLIDAY;
+  if (dayType === "nyse_closed") return SYSTEM_PROMPT_US_HOLIDAY;
   return SYSTEM_PROMPT_WEEKDAY;
 }
 
@@ -188,24 +188,24 @@ function buildUserPrompt(marketData: string, date: string, dayType: TradingDayTy
 - Forex: 24h (Mo–Fr)
 - Rohstoffe: ~00:00–23:00
 - Krypto: 24/7
-- XETRA/EU-Aktien/EU-Indizes: GESCHLOSSEN (Feiertag)
-- US-Indizes/US-Aktien: GESCHLOSSEN (US-Feiertag)
+- XETRA/EU-Aktien/EU-Indizes: GESCHLOSSEN (XETRA-Feiertag)
+- US-Indizes/US-Aktien: GESCHLOSSEN (NYSE-Feiertag)
 WICHTIG: marketCloseTime = XTB-Handelsschluss`,
-    german_holiday: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
+    xetra_closed: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
 - Index-CFDs (US500, US100, US30): 00:05–23:00
 - US-Aktien-CFDs: 15:30–22:00
 - Forex: 24h (Mo–Fr)
 - Rohstoffe: ~00:00–23:00
 - Krypto: 24/7
-- XETRA/EU-Aktien/EU-Indizes: GESCHLOSSEN (Feiertag)
+- XETRA/EU-Aktien/EU-Indizes: GESCHLOSSEN (Börsen-Feiertag)
 WICHTIG: marketCloseTime = XTB-Handelsschluss`,
-    us_holiday: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
+    nyse_closed: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
 - Index-CFDs (DE40, EU50, FRA40, UK100, JAP225): 01:15–22:00
 - EU-Aktien-CFDs (XETRA): 09:00–17:30
 - Forex: 24h (Mo–Fr)
 - Rohstoffe: ~00:00–23:00
 - Krypto: 24/7
-- US-Indizes/US-Aktien: GESCHLOSSEN (US-Feiertag)
+- US-Indizes/US-Aktien: GESCHLOSSEN (NYSE-Feiertag)
 WICHTIG: marketCloseTime = XTB-Handelsschluss`,
     weekday: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
 - Index-CFDs (DE40, EU50, FRA40, UK100, JAP225): 01:15–22:00
@@ -222,8 +222,8 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`,
   const instructionMap: Record<TradingDayType, string> = {
     weekend: "Wähle die 2 absolut besten Krypto-Setups. Analysiere jedes Asset tiefgehend.",
     double_holiday: "Wähle die 2 absolut besten Setups aus Forex, Rohstoffen und Krypto.",
-    german_holiday: "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein XETRA).",
-    us_holiday: "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein US).",
+    xetra_closed: "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein XETRA).",
+    nyse_closed: "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein US).",
     weekday: "Wähle die 2 absolut besten Setups aus ALLEN Assets.",
   };
   const instruction = instructionMap[dayType];
@@ -293,11 +293,11 @@ async function fetchMarketDataForDayType(dayType: TradingDayType): Promise<Asset
     return fetchGlobalMarketData();
   }
 
-  if (dayType === "german_holiday") {
+  if (dayType === "xetra_closed") {
     return fetchNonXetraMarketData();
   }
 
-  if (dayType === "us_holiday") {
+  if (dayType === "nyse_closed") {
     return fetchNonUSMarketData();
   }
 
@@ -326,8 +326,8 @@ export async function generateSignals(): Promise<{
   const modeLabels: Record<TradingDayType, string> = {
     weekend: "Wochenende (nur Krypto)",
     double_holiday: "Doppel-Feiertag (nur Forex/Rohstoffe/Krypto)",
-    german_holiday: "DE-Feiertag (ohne XETRA)",
-    us_holiday: "US-Feiertag (ohne US)",
+    xetra_closed: "XETRA-Feiertag (ohne XETRA)",
+    nyse_closed: "NYSE-Feiertag (ohne US)",
     weekday: "Wochentag (alle Assets)",
   };
   const modeLabel = modeLabels[dayType];

@@ -25,8 +25,12 @@ const MARKET_HOURS: Record<string, { open: number; close: number; label: string 
 // Spätester sinnvoller Einstieg = 2 Stunden vor Schluss
 const MIN_HOURS_BEFORE_CLOSE = 2;
 
-// Deutsche Börsenfeiertage (XETRA geschlossen)
-// Berechnet Ostern per Computus-Algorithmus, daraus die beweglichen Feiertage
+// ── Börsen-Feiertagskalender ──────────────────────────────────
+// WICHTIG: Das sind die BÖRSEN-Feiertage (Exchange Holidays),
+// NICHT die gesetzlichen Landes-Feiertage!
+// Quellen: deutsche-boerse.com/xetra, nyse.com/markets/hours-calendars
+
+// Ostern per Computus-Algorithmus (für bewegliche Feiertage)
 function easterSunday(year: number): Date {
   const a = year % 19;
   const b = Math.floor(year / 100);
@@ -55,24 +59,29 @@ function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function getGermanHolidays(year: number): Set<string> {
+// ── XETRA Exchange Holidays (Deutsche Börse) ──────────────────
+// Quelle: deutsche-boerse.com — jährlicher Handelskalender
+// NICHT identisch mit deutschen gesetzlichen Feiertagen!
+// z.B. Pfingstmontag, Christi Himmelfahrt, Tag der Dt. Einheit → XETRA OFFEN
+function getXetraHolidays(year: number): Set<string> {
   const easter = easterSunday(year);
   const holidays = [
     new Date(year, 0, 1),    // Neujahr
     addDays(easter, -2),     // Karfreitag
     addDays(easter, 1),      // Ostermontag
     new Date(year, 4, 1),    // Tag der Arbeit
-    addDays(easter, 39),     // Christi Himmelfahrt
-    addDays(easter, 50),     // Pfingstmontag
-    new Date(year, 9, 3),    // Tag der Dt. Einheit
+    new Date(year, 11, 24),  // Heiligabend
     new Date(year, 11, 25),  // 1. Weihnachtsfeiertag
     new Date(year, 11, 26),  // 2. Weihnachtsfeiertag
+    new Date(year, 11, 31),  // Silvester
   ];
-  return new Set(holidays.map(dateKey));
+  // Nur Wochentage (Sa/So sind eh Wochenende)
+  return new Set(holidays.filter(d => d.getDay() !== 0 && d.getDay() !== 6).map(dateKey));
 }
 
-// US-Börsenfeiertage (NYSE/NASDAQ geschlossen)
-function getUSHolidays(year: number): Set<string> {
+// ── NYSE Exchange Holidays ────────────────────────────────────
+// Quelle: nyse.com/markets/hours-calendars
+function getNYSEHolidays(year: number): Set<string> {
   const holidays: Date[] = [];
 
   // Neujahr (1. Jan, bei Sa → Fr davor, bei So → Mo danach)
@@ -87,16 +96,16 @@ function getUSHolidays(year: number): Set<string> {
   // Presidents' Day (3. Montag im Februar)
   holidays.push(nthWeekday(year, 1, 1, 3));
 
-  // Good Friday (Karfreitag – 2 Tage vor Ostersonntag)
+  // Good Friday (Karfreitag)
   holidays.push(addDays(easterSunday(year), -2));
 
   // Memorial Day (letzter Montag im Mai)
   holidays.push(lastWeekday(year, 4, 1));
 
-  // Juneteenth (19. Juni, bei Sa → Fr, bei So → Mo)
+  // Juneteenth (19. Juni, observed)
   holidays.push(observedDate(new Date(year, 5, 19)));
 
-  // Independence Day (4. Juli, bei Sa → Fr, bei So → Mo)
+  // Independence Day (4. Juli, observed)
   holidays.push(observedDate(new Date(year, 6, 4)));
 
   // Labor Day (1. Montag im September)
@@ -105,7 +114,7 @@ function getUSHolidays(year: number): Set<string> {
   // Thanksgiving (4. Donnerstag im November)
   holidays.push(nthWeekday(year, 10, 4, 4));
 
-  // Christmas (25. Dez, bei Sa → Fr, bei So → Mo)
+  // Christmas (25. Dez, observed)
   holidays.push(observedDate(new Date(year, 11, 25)));
 
   return new Set(holidays.map(dateKey));
@@ -122,7 +131,7 @@ function nthWeekday(year: number, month: number, weekday: number, n: number): Da
 
 // Letzter Wochentag im Monat (z.B. letzter Montag im Mai)
 function lastWeekday(year: number, month: number, weekday: number): Date {
-  const last = new Date(year, month + 1, 0); // Letzter Tag des Monats
+  const last = new Date(year, month + 1, 0);
   let diff = last.getDay() - weekday;
   if (diff < 0) diff += 7;
   return new Date(year, month + 1, -diff);
@@ -135,27 +144,26 @@ function observedDate(d: Date): Date {
   return d;
 }
 
-export type TradingDayType = "weekday" | "weekend" | "german_holiday" | "double_holiday" | "us_holiday";
+export type TradingDayType = "weekday" | "weekend" | "xetra_closed" | "double_holiday" | "nyse_closed";
 
 export function getTradingDayType(date: Date = new Date()): TradingDayType {
   const day = date.getDay(); // 0=So, 6=Sa
   if (day === 0 || day === 6) return "weekend";
 
-  const deHolidays = getGermanHolidays(date.getFullYear());
-  const usHolidays = getUSHolidays(date.getFullYear());
+  const xetraHolidays = getXetraHolidays(date.getFullYear());
+  const nyseHolidays = getNYSEHolidays(date.getFullYear());
   const key = dateKey(date);
-  const isDE = deHolidays.has(key);
-  const isUS = usHolidays.has(key);
+  const isXetraClosed = xetraHolidays.has(key);
+  const isNYSEClosed = nyseHolidays.has(key);
 
-  if (isDE && isUS) return "double_holiday";
-  if (isDE) return "german_holiday";
-  if (isUS) return "us_holiday";
+  if (isXetraClosed && isNYSEClosed) return "double_holiday";
+  if (isXetraClosed) return "xetra_closed";
+  if (isNYSEClosed) return "nyse_closed";
   return "weekday";
 }
 
-export function isUSHoliday(date: Date = new Date()): boolean {
-  const usHolidays = getUSHolidays(date.getFullYear());
-  return usHolidays.has(dateKey(date));
+export function isNYSEHoliday(date: Date = new Date()): boolean {
+  return getNYSEHolidays(date.getFullYear()).has(dateKey(date));
 }
 
 export function isWeekend(date: Date = new Date()): boolean {
@@ -163,9 +171,17 @@ export function isWeekend(date: Date = new Date()): boolean {
   return day === 0 || day === 6;
 }
 
+export function isXetraHoliday(date: Date = new Date()): boolean {
+  return getXetraHolidays(date.getFullYear()).has(dateKey(date));
+}
+
+// Rückwärtskompatibel — wird im Dashboard noch verwendet
 export function isGermanHoliday(date: Date = new Date()): boolean {
-  const holidays = getGermanHolidays(date.getFullYear());
-  return holidays.has(dateKey(date));
+  return isXetraHoliday(date);
+}
+
+export function isUSHoliday(date: Date = new Date()): boolean {
+  return isNYSEHoliday(date);
 }
 
 export function getMarketInfo(market: string) {

@@ -10,7 +10,7 @@ import EditPortfolio from "./edit-portfolio";
 import PortfolioHeader from "./portfolio-header";
 import MobileMenu from "./mobile-menu";
 import SignOutButton from "@/app/sign-out-button";
-import { isWeekend, isGermanHoliday, isUSHoliday } from "@/lib/market-hours";
+import { isWeekend, isXetraHoliday, isNYSEHoliday } from "@/lib/market-hours";
 import {
   initNotifications,
   requestPermission,
@@ -270,11 +270,11 @@ export default function Dashboard() {
                 <p className="text-xs text-text-muted mt-1">
                   {isWeekend()
                     ? "12 Krypto-Assets werden analysiert."
-                    : isGermanHoliday() && isUSHoliday()
+                    : isXetraHoliday() && isNYSEHoliday()
                       ? "Forex, Rohstoffe & Krypto werden analysiert."
-                      : isGermanHoliday()
+                      : isXetraHoliday()
                         ? "US, Forex, Rohstoffe & Krypto werden analysiert."
-                        : isUSHoliday()
+                        : isNYSEHoliday()
                           ? "EU, Forex, Rohstoffe & Krypto werden analysiert."
                           : "55 Assets werden analysiert."}{" "}
                   Das kann bis zu 30 Sekunden dauern.
