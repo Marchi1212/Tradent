@@ -195,6 +195,12 @@ export async function fetchGlobalMarketData(): Promise<AssetMarketData[]> {
   return fetchAssetBatch(global);
 }
 
+// Nur Forex + Krypto (für Doppel-Feiertage: CME auch geschlossen)
+export async function fetchForexAndCryptoData(): Promise<AssetMarketData[]> {
+  const fxCrypto = WATCHLIST.filter((a) => ["Forex", "Krypto"].includes(a.market));
+  return fetchAssetBatch(fxCrypto);
+}
+
 // Alle Assets OHNE US laden (für US-Feiertage: EU/Forex/Rohstoffe/Crypto offen)
 export async function fetchNonUSMarketData(): Promise<AssetMarketData[]> {
   const nonUS = WATCHLIST.filter((a) => !["NYSE", "NYSE_STOCK"].includes(a.market));

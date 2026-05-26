@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, fetchGlobalMarketData, fetchNonUSMarketData, type AssetMarketData } from "./market-data";
-import { getTradingDayType, type TradingDayType } from "./market-hours";
+import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, fetchGlobalMarketData, fetchNonUSMarketData, fetchForexAndCryptoData, type AssetMarketData } from "./market-data";
+import { getTradingDayType, isCMEClosed, getExchangeNotes, type TradingDayType } from "./market-hours";
 import { fetchMarketContext, formatMarketContextForPrompt } from "./market-context";
 
 export interface GeneratedSignal {
@@ -118,7 +118,7 @@ Regeln:
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute haben sowohl XETRA als auch NYSE geschlossen – europäische UND US-Börsen sind zu. Handelbar sind nur Forex, Rohstoffe und Krypto. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
+const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute haben XETRA, NYSE UND CME geschlossen – Aktien, Indizes und Rohstoffe sind nicht handelbar. Nur Forex und Krypto sind verfügbar. Liquidität ist stark reduziert – konservativere Hebel bevorzugen.
 
 ANALYSE-HIERARCHIE (Gewichtung):
 1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
@@ -134,7 +134,7 @@ Regeln:
 - Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
 - Risk-Reward-Ratio mindestens 1:1.5
 - Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Wähle die 2 BESTEN Assets aus Forex, Rohstoffe ODER Krypto
+- Wähle die 2 BESTEN Assets aus Forex ODER Krypto – KEINE Rohstoffe (CME geschlossen)
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
@@ -180,17 +180,17 @@ function getSystemPrompt(dayType: TradingDayType): string {
   return SYSTEM_PROMPT_WEEKDAY;
 }
 
-function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string): string {
+function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string, exchangeNotes?: string[]): string {
   const tradingHoursMap: Record<TradingDayType, string> = {
     weekend: `Handelszeiten (deutsche Zeit):
 - Krypto: 24/7 – einziger handelbarer Markt am Wochenende`,
     double_holiday: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
-- Forex: 24h (Mo–Fr)
-- Rohstoffe: ~00:00–23:00
+- Forex: 24h (Mo–Fr) – eingeschränkte Liquidität
 - Krypto: 24/7
-- XETRA/EU-Aktien/EU-Indizes: GESCHLOSSEN (XETRA-Feiertag)
-- US-Indizes/US-Aktien: GESCHLOSSEN (NYSE-Feiertag)
-WICHTIG: marketCloseTime = XTB-Handelsschluss`,
+- XETRA/EU: GESCHLOSSEN (XETRA-Feiertag)
+- NYSE/US: GESCHLOSSEN (NYSE-Feiertag)
+- Rohstoffe (CME): GESCHLOSSEN
+WICHTIG: NUR Forex und Krypto handelbar!`,
     xetra_closed: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
 - Index-CFDs (US500, US100, US30): 00:05–23:00
 - US-Aktien-CFDs: 15:30–22:00
@@ -203,10 +203,10 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss`,
 - Index-CFDs (DE40, EU50, FRA40, UK100, JAP225): 01:15–22:00
 - EU-Aktien-CFDs (XETRA): 09:00–17:30
 - Forex: 24h (Mo–Fr)
-- Rohstoffe: ~00:00–23:00
+- Rohstoffe (CME): REDUZIERTE ZEITEN ~00:00–19:00/20:30 (Feiertag, früherer Schluss!)
 - Krypto: 24/7
 - US-Indizes/US-Aktien: GESCHLOSSEN (NYSE-Feiertag)
-WICHTIG: marketCloseTime = XTB-Handelsschluss`,
+WICHTIG: marketCloseTime = XTB-Handelsschluss, bei Rohstoffen max 19:00–20:30!`,
     weekday: `XTB CFD-Handelszeiten (deutsche Zeit / CET):
 - Index-CFDs (DE40, EU50, FRA40, UK100, JAP225): 01:15–22:00
 - Index-CFDs (US500, US100, US30): 00:05–23:00
@@ -221,7 +221,7 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`,
 
   const instructionMap: Record<TradingDayType, string> = {
     weekend: "Wähle die 2 absolut besten Krypto-Setups. Analysiere jedes Asset tiefgehend.",
-    double_holiday: "Wähle die 2 absolut besten Setups aus Forex, Rohstoffen und Krypto.",
+    double_holiday: "Wähle die 2 absolut besten Setups aus Forex und Krypto. KEINE Rohstoffe (CME geschlossen).",
     xetra_closed: "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein XETRA).",
     nyse_closed: "Wähle die 2 absolut besten Setups aus den VERFÜGBAREN Märkten (kein US).",
     weekday: "Wähle die 2 absolut besten Setups aus ALLEN Assets.",
@@ -235,10 +235,14 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`,
     ? `\n${marketContext}\n`
     : "";
 
+  const exchangeBlock = exchangeNotes && exchangeNotes.length > 0
+    ? `\nBÖRSEN-HINWEISE:\n${exchangeNotes.join("\n")}\n`
+    : "";
+
   return `Datum: ${date}
 
 ${tradingHours}
-${contextBlock}
+${exchangeBlock}${contextBlock}
 Marktdaten:
 
 ${marketData}
@@ -290,7 +294,8 @@ async function fetchMarketDataForDayType(dayType: TradingDayType): Promise<Asset
   }
 
   if (dayType === "double_holiday") {
-    return fetchGlobalMarketData();
+    // Doppel-Feiertag = XETRA + NYSE + CME geschlossen → nur Forex + Krypto
+    return fetchForexAndCryptoData();
   }
 
   if (dayType === "xetra_closed") {
@@ -325,7 +330,7 @@ export async function generateSignals(): Promise<{
   const dayType = getTradingDayType();
   const modeLabels: Record<TradingDayType, string> = {
     weekend: "Wochenende (nur Krypto)",
-    double_holiday: "Doppel-Feiertag (nur Forex/Rohstoffe/Krypto)",
+    double_holiday: "Doppel-Feiertag (nur Forex/Krypto, CME auch geschlossen)",
     xetra_closed: "XETRA-Feiertag (ohne XETRA)",
     nyse_closed: "NYSE-Feiertag (ohne US)",
     weekday: "Wochentag (alle Assets)",
@@ -351,7 +356,7 @@ export async function generateSignals(): Promise<{
     console.log(`High-Impact Events heute: ${marketContext.economicEvents.map(e => e.title).join(", ")}`);
   }
 
-  const minAssets = dayType === "weekend" ? 3 : 5;
+  const minAssets = dayType === "weekend" ? 3 : dayType === "double_holiday" ? 8 : 5;
   if (marketData.length < minAssets) {
     throw new Error(
       `Zu wenig Marktdaten geladen (${marketData.length} Assets). Mindestens ${minAssets} benötigt.`
@@ -372,6 +377,11 @@ export async function generateSignals(): Promise<{
 
   const formattedData = formatMarketDataForPrompt(marketData);
   const formattedContext = formatMarketContextForPrompt(marketContext);
+  const exchangeNotes = getExchangeNotes();
+
+  if (exchangeNotes.length > 0) {
+    console.log(`Börsen-Hinweise: ${exchangeNotes.join(" | ")}`);
+  }
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -380,7 +390,7 @@ export async function generateSignals(): Promise<{
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today, dayType, formattedContext),
+        content: buildUserPrompt(formattedData, today, dayType, formattedContext, exchangeNotes),
       },
     ],
   });

@@ -196,7 +196,7 @@ export default async function DocsPage() {
               <li><strong>Wochenende:</strong> Nur 12 Krypto-Assets (einziger 24/7-Markt)</li>
               <li><strong>XETRA-Feiertag:</strong> Ohne XETRA/EU &mdash; US, Forex, Rohstoffe und Krypto bleiben verfuegbar (basiert auf dem offiziellen XETRA-Handelskalender, nicht auf gesetzlichen Feiertagen)</li>
               <li><strong>NYSE-Feiertag:</strong> Ohne NYSE/NASDAQ &mdash; EU, Forex, Rohstoffe und Krypto bleiben verfuegbar (basiert auf dem offiziellen NYSE-Kalender)</li>
-              <li><strong>Doppel-Feiertag:</strong> Wenn XETRA und NYSE gleichzeitig geschlossen sind (z.B. Karfreitag, Neujahr) &mdash; nur Forex, Rohstoffe und Krypto (26 Assets)</li>
+              <li><strong>Doppel-Feiertag:</strong> Wenn XETRA, NYSE und CME gleichzeitig geschlossen sind (z.B. Karfreitag, Neujahr) &mdash; nur Forex und Krypto (20 Assets)</li>
             </ul>
           </div>
         </section>

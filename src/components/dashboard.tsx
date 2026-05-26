@@ -271,7 +271,7 @@ export default function Dashboard() {
                   {isWeekend()
                     ? "12 Krypto-Assets werden analysiert."
                     : isXetraHoliday() && isNYSEHoliday()
-                      ? "Forex, Rohstoffe & Krypto werden analysiert."
+                      ? "Forex & Krypto werden analysiert (Börsen + CME geschlossen)."
                       : isXetraHoliday()
                         ? "US, Forex, Rohstoffe & Krypto werden analysiert."
                         : isNYSEHoliday()
