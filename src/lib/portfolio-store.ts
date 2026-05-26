@@ -305,6 +305,47 @@ export async function getTrades(portfolioId: string): Promise<Trade[]> {
   return (data || []).map(toTrade);
 }
 
+// Offene Trades mit Ticker + Kategorie aus dem Signal (für Close-Flow im Trades-Tab)
+export interface OpenTradeWithSignal extends Trade {
+  ticker: string;
+  category: string;
+}
+
+export async function getOpenTrades(portfolioId: string): Promise<OpenTradeWithSignal[]> {
+  const supabase = createClient();
+
+  // 1. Offene Trades laden
+  const { data: tradesData, error: tradesError } = await supabase
+    .from("trades")
+    .select("*")
+    .eq("portfolio_id", portfolioId)
+    .eq("status", "open")
+    .order("opened_at", { ascending: false });
+
+  if (tradesError) throw tradesError;
+  if (!tradesData || tradesData.length === 0) return [];
+
+  const trades = tradesData.map(toTrade);
+
+  // 2. Signal-Infos (Ticker + Kategorie) für diese Trades laden
+  const signalIds = [...new Set(trades.map((t: Trade) => t.signalId))];
+  const { data: signalsData } = await supabase
+    .from("signals")
+    .select("id, ticker, category")
+    .in("id", signalIds);
+
+  const signalMap = new Map<string, { ticker: string; category: string }>();
+  for (const s of (signalsData || []) as { id: string; ticker: string; category: string }[]) {
+    signalMap.set(s.id, { ticker: s.ticker, category: s.category });
+  }
+
+  return trades.map((t: Trade) => ({
+    ...t,
+    ticker: signalMap.get(t.signalId)?.ticker || "",
+    category: signalMap.get(t.signalId)?.category || "",
+  }));
+}
+
 export async function getOpenTradeForSignal(portfolioId: string, signalId: string): Promise<Trade | null> {
   const supabase = createClient();
   const { data, error } = await supabase

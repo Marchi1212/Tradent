@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
-import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, type Portfolio } from "@/lib/portfolio-store";
+import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, getOpenTrades, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [signalsWaitUntil, setSignalsWaitUntil] = useState<string | null>(null);
   const [notifState, setNotifState] = useState<"unknown" | "granted" | "denied" | "prompt" | "unsupported">("unknown");
   const [openTradeSignals, setOpenTradeSignals] = useState<Set<string>>(new Set());
+  const [openTradeCount, setOpenTradeCount] = useState(0);
 
   async function loadPortfolio() {
     try {
@@ -114,6 +115,14 @@ export default function Dashboard() {
         if (trade) openIds.add(s.id);
       }
       setOpenTradeSignals(openIds);
+
+      // Alle offenen Trades zählen (für Badge)
+      try {
+        const allOpen = await getOpenTrades(portfolio!.id);
+        setOpenTradeCount(allOpen.length);
+      } catch {
+        // Stille Fehlerbehandlung
+      }
     }
     checkOpenTrades();
   }, [signals, portfolio]);
@@ -220,13 +229,18 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setActiveTab("trades")}
-            className={`flex-1 rounded-[6px] py-2 text-sm font-semibold text-center transition-colors ${
+            className={`flex-1 rounded-[6px] py-2 text-sm font-semibold text-center transition-colors relative ${
               activeTab === "trades"
                 ? "bg-bg-primary text-text-primary shadow-sm"
                 : "text-text-muted"
             }`}
           >
             Trades
+            {openTradeCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center px-1">
+                {openTradeCount}
+              </span>
+            )}
           </button>
         </div>
       </div>}
@@ -321,7 +335,7 @@ export default function Dashboard() {
             ) : null}
           </>
         ) : portfolio ? (
-          <TradeHistory portfolio={portfolio} />
+          <TradeHistory portfolio={portfolio} onPortfolioUpdate={loadPortfolio} />
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-sm font-semibold text-text-primary">Kein Portfolio aktiv</p>

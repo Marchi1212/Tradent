@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Trade, Portfolio } from "@/lib/portfolio-store";
-import { getTrades, allocateCapital } from "@/lib/portfolio-store";
+import type { Trade, Portfolio, OpenTradeWithSignal } from "@/lib/portfolio-store";
+import { getTrades, getOpenTrades, closeTrade, allocateCapital } from "@/lib/portfolio-store";
 import { createClient } from "@/lib/supabase/client";
 
 // XTB-Spreads als % vom Kurs (konservativ, Round-Trip)
@@ -35,19 +35,28 @@ type SubTab = "my-trades" | "all-signals";
 
 interface Props {
   portfolio: Portfolio;
+  onPortfolioUpdate?: () => void;
 }
 
-export default function TradeHistory({ portfolio }: Props) {
+export default function TradeHistory({ portfolio, onPortfolioUpdate }: Props) {
   const portfolioId = portfolio.id;
   const [subTab, setSubTab] = useState<SubTab>("my-trades");
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  async function loadTrades() {
+    try {
+      const t = await getTrades(portfolioId);
+      setTrades(t);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoaded(true);
+    }
+  }
+
   useEffect(() => {
-    getTrades(portfolioId)
-      .then(setTrades)
-      .catch(console.error)
-      .finally(() => setLoaded(true));
+    loadTrades();
   }, [portfolioId]);
 
   if (!loaded) return null;
@@ -79,7 +88,7 @@ export default function TradeHistory({ portfolio }: Props) {
       </div>
 
       {subTab === "my-trades" ? (
-        <MyTrades trades={trades} />
+        <MyTrades trades={trades} portfolioId={portfolioId} onTradeClose={() => { loadTrades(); onPortfolioUpdate?.(); }} />
       ) : (
         <AllSignals budget={portfolio.budget} portfolioCreatedAt={portfolio.createdAt} />
       )}
@@ -89,8 +98,16 @@ export default function TradeHistory({ portfolio }: Props) {
 
 /* ── Meine Trades ────────────────────────────── */
 
-function MyTrades({ trades }: { trades: Trade[] }) {
-  if (trades.length === 0) {
+function MyTrades({ trades, portfolioId, onTradeClose }: { trades: Trade[]; portfolioId: string; onTradeClose: () => void }) {
+  const [openTradesWithSignal, setOpenTradesWithSignal] = useState<OpenTradeWithSignal[]>([]);
+
+  useEffect(() => {
+    getOpenTrades(portfolioId)
+      .then(setOpenTradesWithSignal)
+      .catch(console.error);
+  }, [portfolioId, trades]);
+
+  if (trades.length === 0 && openTradesWithSignal.length === 0) {
     return (
       <EmptyState
         icon={
@@ -104,7 +121,6 @@ function MyTrades({ trades }: { trades: Trade[] }) {
     );
   }
 
-  const openTrades = trades.filter((t) => t.status === "open");
   const closedTrades = trades.filter((t) => t.status === "closed");
   const totalResult = closedTrades.reduce((sum, t) => sum + (t.result || 0), 0);
 
@@ -130,15 +146,15 @@ function MyTrades({ trades }: { trades: Trade[] }) {
         </div>
       )}
 
-      {/* Offene Trades */}
-      {openTrades.length > 0 && (
+      {/* Offene Trades (mit Close-Möglichkeit) */}
+      {openTradesWithSignal.length > 0 && (
         <div>
           <p className="text-[11px] text-text-muted uppercase font-semibold mb-3">
-            Offen ({openTrades.length})
+            Offen ({openTradesWithSignal.length})
           </p>
           <div className="space-y-2">
-            {openTrades.map((trade) => (
-              <TradeRow key={trade.id} trade={trade} />
+            {openTradesWithSignal.map((trade) => (
+              <OpenTradeRow key={trade.id} trade={trade} onClose={onTradeClose} />
             ))}
           </div>
         </div>
@@ -448,6 +464,156 @@ function EmptyState({ icon, title, subtitle }: { icon: React.ReactNode; title: s
       </div>
       <p className="text-sm font-semibold text-text-primary">{title}</p>
       <p className="text-xs text-text-muted mt-1 max-w-[220px]">{subtitle}</p>
+    </div>
+  );
+}
+
+/* ── Offener Trade (mit Close-Flow) ──────────── */
+
+function OpenTradeRow({ trade, onClose }: { trade: OpenTradeWithSignal; onClose: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeResult, setCloseResult] = useState<{ exitPrice: number; pnl: number; pnlPercent: number } | null>(null);
+
+  const openDate = new Date(trade.openedAt).toLocaleString("de-DE", {
+    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+
+  async function handleClose() {
+    try {
+      setClosing(true);
+      const res = await fetch(`/api/price?ticker=${encodeURIComponent(trade.ticker)}`);
+      if (!res.ok) throw new Error("Kurs nicht verfügbar");
+      const { price } = await res.json();
+
+      const leverage = parseFloat(trade.leverage) || 1;
+      const spreadCost = (SPREAD_PERCENT[trade.category] || 0.05) * leverage;
+      const priceDiff = trade.direction === "LONG"
+        ? price - trade.entry
+        : trade.entry - price;
+      const pnlPercent = (priceDiff / trade.entry) * 100 * leverage - spreadCost;
+      const pnl = Math.round(trade.budget * (pnlPercent / 100) * 100) / 100;
+
+      setCloseResult({ exitPrice: price, pnl, pnlPercent: Math.round(pnlPercent * 100) / 100 });
+    } catch (err) {
+      console.error("Kurs laden fehlgeschlagen:", err);
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  async function handleConfirmClose() {
+    if (!closeResult) return;
+    try {
+      await closeTrade(trade.id, closeResult.exitPrice, closeResult.pnl);
+      onClose();
+    } catch (err) {
+      console.error("Position schließen fehlgeschlagen:", err);
+    }
+  }
+
+  return (
+    <div className="rounded-[12px] bg-[#1A1A1A] overflow-hidden border border-amber-500/30">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 py-3.5 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-3">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+            trade.direction === "LONG"
+              ? "bg-green-500/15 text-green-400"
+              : "bg-red-500/15 text-red-400"
+          }`}>
+            {trade.direction === "LONG" ? "↑" : "↓"}
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-bold text-white">{trade.asset}</p>
+            <p className="text-xs text-white/55">
+              {openDate} · {trade.leverage} · {trade.budget.toFixed(0)}€
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="inline-block rounded-full bg-amber-500/15 text-amber-400 px-2.5 py-0.5 text-xs font-semibold">
+            Offen
+          </span>
+          <svg
+            className={`w-4 h-4 text-white/40 transition-transform ${expanded ? "rotate-180" : ""}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-3 border-t border-white/10 pt-2">
+          {/* Entry / SL / TP */}
+          <div className="grid grid-cols-3 gap-3 pb-2">
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Einstieg</p>
+              <p className="text-sm font-bold text-white mt-0.5">{trade.entry.toLocaleString("de-DE")}</p>
+            </div>
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Stop-Loss</p>
+              <p className="text-sm font-bold text-white mt-0.5">{trade.stopLoss.toLocaleString("de-DE")}</p>
+            </div>
+            <div>
+              <p className="text-[13px] text-white/55 uppercase">Take-Profit</p>
+              <p className="text-sm font-bold text-white mt-0.5">{trade.takeProfit.toLocaleString("de-DE")}</p>
+            </div>
+          </div>
+
+          {/* Close Result Preview */}
+          {closeResult && (
+            <div className="grid grid-cols-2 gap-3 py-2 border-t border-white/10">
+              <div>
+                <p className="text-[13px] text-white/55 uppercase">Aktueller Kurs</p>
+                <p className="text-sm font-bold text-white mt-0.5">{closeResult.exitPrice.toLocaleString("de-DE")}</p>
+              </div>
+              <div>
+                <p className="text-[13px] text-white/55 uppercase">Ergebnis</p>
+                <p className={`text-sm font-bold mt-0.5 ${closeResult.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {closeResult.pnl >= 0 ? "+" : ""}{closeResult.pnl.toFixed(2)}€ ({closeResult.pnlPercent >= 0 ? "+" : ""}{closeResult.pnlPercent.toFixed(1)}%)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Close Button */}
+          <div className="pt-2 border-t border-white/10">
+            {!closeResult ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleClose(); }}
+                disabled={closing}
+                className="w-full rounded-[6px] bg-amber-500 px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-amber-400 disabled:opacity-50"
+              >
+                {closing ? "Kurs wird geladen…" : "Jetzt schließen"}
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCloseResult(null); }}
+                  className="flex-1 rounded-[6px] border border-white/20 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleConfirmClose(); }}
+                  className={`flex-1 rounded-[6px] px-4 py-2.5 text-sm font-bold text-white transition-colors ${
+                    closeResult.pnl >= 0
+                      ? "bg-green-600 hover:bg-green-500"
+                      : "bg-red-600 hover:bg-red-500"
+                  }`}
+                >
+                  Schließen ({closeResult.pnl >= 0 ? "+" : ""}{closeResult.pnl.toFixed(2)}€)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
