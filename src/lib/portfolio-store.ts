@@ -311,15 +311,23 @@ export interface OpenTradeWithSignal extends Trade {
   category: string;
 }
 
+// Nur VERGANGENE offene Trades (älter als heute) — heutige laufen auf Signal-Karten
 export async function getOpenTrades(portfolioId: string): Promise<OpenTradeWithSignal[]> {
   const supabase = createClient();
 
-  // 1. Offene Trades laden
+  // Heute 00:00 CET als Cutoff
+  const now = new Date();
+  const cetStr = now.toLocaleString("en-US", { timeZone: "Europe/Berlin" });
+  const cet = new Date(cetStr);
+  const todayStart = new Date(cet.getFullYear(), cet.getMonth(), cet.getDate());
+
+  // 1. Offene Trades laden die VOR heute eröffnet wurden
   const { data: tradesData, error: tradesError } = await supabase
     .from("trades")
     .select("*")
     .eq("portfolio_id", portfolioId)
     .eq("status", "open")
+    .lt("opened_at", todayStart.toISOString())
     .order("opened_at", { ascending: false });
 
   if (tradesError) throw tradesError;
