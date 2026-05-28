@@ -99,15 +99,15 @@ export default function TradeHistory({ portfolio, onPortfolioUpdate }: Props) {
 /* ── Meine Trades ────────────────────────────── */
 
 function MyTrades({ trades, portfolioId, onTradeClose }: { trades: Trade[]; portfolioId: string; onTradeClose: () => void }) {
-  const [openTradesWithSignal, setOpenTradesWithSignal] = useState<OpenTradeWithSignal[]>([]);
+  const [overdueTradesWithSignal, setOverdueTradesWithSignal] = useState<OpenTradeWithSignal[]>([]);
 
   useEffect(() => {
     getOpenTrades(portfolioId)
-      .then(setOpenTradesWithSignal)
+      .then(setOverdueTradesWithSignal)
       .catch(console.error);
   }, [portfolioId, trades]);
 
-  if (trades.length === 0 && openTradesWithSignal.length === 0) {
+  if (trades.length === 0 && overdueTradesWithSignal.length === 0) {
     return (
       <EmptyState
         icon={
@@ -120,6 +120,15 @@ function MyTrades({ trades, portfolioId, onTradeClose }: { trades: Trade[]; port
       />
     );
   }
+
+  // Heute 00:00 UTC als Grenze
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  // Heutige offene Trades (aus trades-Liste, nur von heute)
+  const todayOpenTrades = trades.filter(
+    (t) => t.status === "open" && new Date(t.openedAt) >= todayStart
+  );
 
   const closedTrades = trades.filter((t) => t.status === "closed");
   const totalResult = closedTrades.reduce((sum, t) => sum + (t.result || 0), 0);
@@ -146,14 +155,28 @@ function MyTrades({ trades, portfolioId, onTradeClose }: { trades: Trade[]; port
         </div>
       )}
 
-      {/* Offene Trades (mit Close-Möglichkeit) */}
-      {openTradesWithSignal.length > 0 && (
+      {/* Offen – heutige aktive Trades */}
+      {todayOpenTrades.length > 0 && (
         <div>
           <p className="text-[11px] text-text-muted uppercase font-semibold mb-3">
-            Offen ({openTradesWithSignal.length})
+            Offen ({todayOpenTrades.length})
           </p>
           <div className="space-y-2">
-            {openTradesWithSignal.map((trade) => (
+            {todayOpenTrades.map((trade) => (
+              <TradeRow key={trade.id} trade={trade} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Überfällig – vergangene offene Trades (mit Close-Flow) */}
+      {overdueTradesWithSignal.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase font-semibold mb-3 text-amber-400">
+            Überfällig ({overdueTradesWithSignal.length})
+          </p>
+          <div className="space-y-2">
+            {overdueTradesWithSignal.map((trade) => (
               <OpenTradeRow key={trade.id} trade={trade} onClose={onTradeClose} />
             ))}
           </div>

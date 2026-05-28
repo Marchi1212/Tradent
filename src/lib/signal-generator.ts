@@ -52,7 +52,10 @@ Regeln:
 - Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
 - Risk-Reward-Ratio mindestens 1:1.5
 - Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Stop-Loss muss eng genug sein für Daytrading (Intraday-Levels)
+- Stop-Loss muss eng genug sein für Daytrading, aber NICHT enger als die Mindestabstände unten
+- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
+  Index: ≥0.8% | Aktie: ≥1.0% | Rohstoff: ≥1.5% | Forex: ≥0.3% | Krypto: ≥2.0%
+  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
 - Wähle die 2 BESTEN Assets – egal ob Index, Aktie, Forex, Rohstoff oder Krypto
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
@@ -83,6 +86,7 @@ Regeln:
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
 - Krypto-Volatilität am Wochenende beachten (oft niedriger, aber mit plötzlichen Spikes)
+- STOP-LOSS MINDESTABSTAND: Krypto ≥2.0% vom Entry. Zu enge SLs werden durch normales Rauschen ausgelöst.
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes 2-Stunden-Zeitfenster (z.B. "09:00–11:00", "14:00–16:00"). MAXIMAL 2 Stunden breit, nicht breiter!
 - marketCloseTime = "21:00" (Krypto 24/7, aber Trade soll abends geschlossen werden)
@@ -110,6 +114,9 @@ Regeln:
 - Wähle die 2 BESTEN Assets aus den VERFÜGBAREN Märkten (US, Forex, Rohstoffe, Krypto)
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
+- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
+  Aktie: ≥1.0% | Rohstoff: ≥1.5% | Forex: ≥0.3% | Krypto: ≥2.0%
+  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität (z.B. "15:30–17:30"). MAXIMAL 2 Stunden breit!
 - marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
@@ -137,6 +144,9 @@ Regeln:
 - Wähle die 2 BESTEN Assets aus Forex ODER Krypto – KEINE Rohstoffe (CME geschlossen)
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
+- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
+  Forex: ≥0.3% | Krypto: ≥2.0%
+  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes 2-Stunden-Zeitfenster. MAXIMAL 2 Stunden breit!
 - marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
@@ -164,6 +174,9 @@ Regeln:
 - Wähle die 2 BESTEN Assets aus den VERFÜGBAREN Märkten (kein US)
 - Beide Assets MÜSSEN unterschiedlich sein
 - LONG und SHORT sind beide möglich
+- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
+  Index: ≥0.8% | Aktie: ≥1.0% | Rohstoff: ≥1.5% | Forex: ≥0.3% | Krypto: ≥2.0%
+  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität. MAXIMAL 2 Stunden breit!
 - marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
@@ -419,6 +432,10 @@ export async function generateSignals(): Promise<{
   parsed.steady.riskClass = "steady";
   parsed.bold.riskClass = "bold";
 
+  // SL-Mindestabstände erzwingen (Sicherheitsnetz falls Prompt ignoriert wird)
+  enforceMinSlDistance(parsed.steady);
+  enforceMinSlDistance(parsed.bold);
+
   console.log(
     `Signale generiert: ${parsed.steady.asset} (Steady, ${parsed.steady.market}) + ${parsed.bold.asset} (Bold, ${parsed.bold.market})`
   );
@@ -453,6 +470,38 @@ export async function generateSignals(): Promise<{
   }
 
   return parsed;
+}
+
+// ── SL-Mindestabstand erzwingen ──────────────────
+
+const MIN_SL_PERCENT: Record<string, number> = {
+  Index: 0.8,
+  Aktie: 1.0,
+  Rohstoff: 1.5,
+  Forex: 0.3,
+  Krypto: 2.0,
+};
+
+function enforceMinSlDistance(signal: GeneratedSignal): void {
+  const minPct = MIN_SL_PERCENT[signal.category];
+  if (!minPct) return;
+
+  const slDist = Math.abs(signal.entry - signal.stopLoss) / signal.entry * 100;
+  if (slDist >= minPct) return;
+
+  // SL erweitern auf Mindestabstand
+  const adjustment = signal.entry * (minPct / 100);
+  const oldSl = signal.stopLoss;
+
+  if (signal.direction === "LONG") {
+    signal.stopLoss = Math.round((signal.entry - adjustment) * 10000) / 10000;
+  } else {
+    signal.stopLoss = Math.round((signal.entry + adjustment) * 10000) / 10000;
+  }
+
+  console.log(
+    `SL-Korrektur (${signal.asset}): ${oldSl} → ${signal.stopLoss} (${slDist.toFixed(2)}% → ${minPct}% Mindestabstand)`
+  );
 }
 
 // ── Perplexity News-Gegencheck ──────────────────
