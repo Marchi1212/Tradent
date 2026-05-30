@@ -188,8 +188,8 @@ export function scheduleCloseNotification(
 
   scheduleNotification(
     `close-${signalId}`,
-    `Position schließen: ${asset}`,
-    "Markt schließt in 30 Minuten. Jetzt Position prüfen.",
+    "Trades noch offen",
+    "Check deine Positionen bevor du Feierabend machst.",
     closeTime
   );
 }

@@ -38,8 +38,8 @@ export async function queueCloseReminder(
     {
       user_id: userId,
       signal_id: signalId,
-      title: `Position schließen: ${asset}`,
-      body: "Markt schließt in 30 Minuten. Jetzt Position prüfen.",
+      title: "Trades noch offen",
+      body: "Check deine Positionen bevor du Feierabend machst.",
       fire_at: fireAt.toISOString(),
       sent: false,
     },
