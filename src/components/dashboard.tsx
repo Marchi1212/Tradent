@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { Signal } from "@/lib/mock-signals";
 import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, getOpenTrades, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
@@ -51,6 +51,10 @@ export default function Dashboard() {
   const [notifState, setNotifState] = useState<"unknown" | "granted" | "denied" | "prompt" | "unsupported">("unknown");
   const [openTradeSignals, setOpenTradeSignals] = useState<Set<string>>(new Set());
   const [openTradeCount, setOpenTradeCount] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const pullStartY = useRef<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const mainRef = useRef<HTMLElement>(null);
 
   async function loadPortfolio() {
     try {
@@ -126,6 +130,60 @@ export default function Dashboard() {
     }
     checkOpenTrades();
   }, [signals, portfolio]);
+
+  // Auto-Refresh wenn App in den Vordergrund kommt (PWA)
+  const refreshAll = useCallback(() => {
+    loadPortfolio();
+    loadSignals();
+  }, []);
+
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        refreshAll();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [refreshAll]);
+
+  // Pull-to-Refresh (Touch-Geste)
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+
+    function onTouchStart(e: TouchEvent) {
+      if (window.scrollY === 0) {
+        pullStartY.current = e.touches[0].clientY;
+      }
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (pullStartY.current === null) return;
+      const dy = e.touches[0].clientY - pullStartY.current;
+      if (dy > 0 && window.scrollY === 0) {
+        setPullDistance(Math.min(dy * 0.4, 80));
+        if (dy > 60) e.preventDefault();
+      }
+    }
+    function onTouchEnd() {
+      if (pullDistance > 50) {
+        setPullRefreshing(true);
+        refreshAll();
+        setTimeout(() => setPullRefreshing(false), 1000);
+      }
+      pullStartY.current = null;
+      setPullDistance(0);
+    }
+
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [pullDistance, refreshAll]);
 
   // Entry-Notifications schedulen sobald Signale geladen sind
   useEffect(() => {
@@ -245,7 +303,16 @@ export default function Dashboard() {
         </div>
       </div>}
 
-      <main className="flex-1 px-5 py-6 w-full max-w-lg mx-auto space-y-6">
+      {/* Pull-to-Refresh Indikator */}
+      {(pullDistance > 0 || pullRefreshing) && (
+        <div className="flex justify-center py-2" style={{ height: pullRefreshing ? 40 : pullDistance * 0.5 }}>
+          <div className={`w-5 h-5 border-2 border-text-muted border-t-text-primary rounded-full ${pullRefreshing || pullDistance > 50 ? "animate-spin" : ""}`}
+            style={{ opacity: Math.min(pullDistance / 50, 1) }}
+          />
+        </div>
+      )}
+
+      <main ref={mainRef} className="flex-1 px-5 py-6 w-full max-w-lg mx-auto space-y-6">
         {!loaded ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-8 h-8 border-2 border-text-muted border-t-text-primary rounded-full animate-spin mb-4" />
