@@ -12,6 +12,42 @@ async function getUserId(): Promise<string | null> {
   return user?.id || null;
 }
 
+// Entry-Reminder in Queue eintragen (wenn Einstiegsfenster beginnt)
+export async function queueEntryReminder(
+  signalId: string,
+  asset: string,
+  direction: string,
+  leverage: string,
+  entry: number,
+  optimalEntry: string
+) {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  // "15:30 – 17:00" oder "10:00 – 12:00" → erste Uhrzeit nehmen
+  const match = optimalEntry.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return;
+
+  const fireAt = new Date();
+  fireAt.setHours(parseInt(match[1]), parseInt(match[2]), 0, 0);
+
+  // Schon vorbei? Nicht eintragen.
+  if (fireAt <= new Date()) return;
+
+  const supabase = createClient();
+  await supabase.from("push_queue").upsert(
+    {
+      user_id: userId,
+      signal_id: `entry-${signalId}`,
+      title: `Einstiegsfenster: ${asset}`,
+      body: `${direction} · ${leverage} · Entry bei ${entry.toLocaleString("de-DE")}`,
+      fire_at: fireAt.toISOString(),
+      sent: false,
+    },
+    { onConflict: "user_id,signal_id" }
+  );
+}
+
 // Close-Reminder in Queue eintragen (30 min vor Marktschluss)
 export async function queueCloseReminder(
   signalId: string,

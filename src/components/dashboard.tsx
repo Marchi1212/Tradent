@@ -19,6 +19,7 @@ import {
   scheduleEntryNotification,
   subscribeToPush,
 } from "@/lib/notifications";
+import { queueEntryReminder } from "@/lib/push-queue";
 
 type Tab = "signals" | "trades";
 
@@ -187,9 +188,16 @@ export default function Dashboard() {
 
   // Entry-Notifications schedulen sobald Signale geladen sind
   useEffect(() => {
-    if (!signals || !hasPermission()) return;
+    if (!signals) return;
+    // Server-Push: immer queuen (funktioniert auch wenn App geschlossen)
     for (const s of [signals.steady, signals.bold]) {
-      scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+      queueEntryReminder(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+    }
+    // Lokaler Timer: nur wenn Permission granted (Fallback wenn App offen)
+    if (hasPermission()) {
+      for (const s of [signals.steady, signals.bold]) {
+        scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+      }
     }
   }, [signals]);
 
