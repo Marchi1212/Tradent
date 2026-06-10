@@ -188,18 +188,22 @@ export default function Dashboard() {
 
   // Entry-Notifications schedulen sobald Signale geladen sind
   useEffect(() => {
-    if (!signals) return;
-    // Server-Push: immer queuen (funktioniert auch wenn App geschlossen)
-    for (const s of [signals.steady, signals.bold]) {
-      queueEntryReminder(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
-    }
-    // Lokaler Timer: nur wenn Permission granted (Fallback wenn App offen)
-    if (hasPermission()) {
-      for (const s of [signals.steady, signals.bold]) {
-        scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+    if (!signals || !portfolio) return;
+    async function scheduleEntries() {
+      for (const s of [signals!.steady, signals!.bold]) {
+        // Nicht queuen wenn schon ein Trade für dieses Signal existiert
+        const trade = await getOpenTradeForSignal(portfolio!.id, s.id);
+        if (trade) continue;
+        // Server-Push (funktioniert auch wenn App geschlossen)
+        queueEntryReminder(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+        // Lokaler Timer als Fallback (wenn App offen)
+        if (hasPermission()) {
+          scheduleEntryNotification(s.id, s.asset, s.direction, s.leverage, s.entry, s.optimalEntry);
+        }
       }
     }
-  }, [signals]);
+    scheduleEntries();
+  }, [signals, portfolio]);
 
   // Allokation basiert auf Original-Budget (nicht currentBalance),
   // damit die Aufteilung fix bleibt wenn Position 1 schon offen ist

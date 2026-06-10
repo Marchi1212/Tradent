@@ -6,7 +6,7 @@ import type { Portfolio } from "@/lib/portfolio-store";
 import { getOpenTradeForSignal, getTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 import { scheduleCloseNotification, cancelCloseNotification } from "@/lib/notifications";
-import { queueCloseReminder, unqueueCloseReminder } from "@/lib/push-queue";
+import { queueCloseReminder, unqueueCloseReminder, unqueueEntryReminder } from "@/lib/push-queue";
 
 function ClockIcon({ className }: { className?: string }) {
   return (
@@ -348,6 +348,8 @@ export default function SignalCard({
       setOpenTrade(trade);
       setPositionOpened(true);
       setRevalidation(null);
+      // Entry-Reminder entfernen (Trade ist eröffnet)
+      unqueueEntryReminder(signal.id);
       // Close-Reminder: lokal (wenn App offen) + Server-Push (wenn App zu)
       scheduleCloseNotification(signal.id, signal.asset, signal.marketCloseTime);
       queueCloseReminder(signal.id, signal.asset, signal.marketCloseTime);

@@ -35,6 +35,9 @@ export async function queueEntryReminder(
   if (fireAt <= new Date()) return;
 
   const supabase = createClient();
+
+  // Nur eintragen wenn noch nicht vorhanden (ignoreDuplicates statt upsert,
+  // damit ein App-Refresh nicht sent=false zurücksetzt)
   await supabase.from("push_queue").upsert(
     {
       user_id: userId,
@@ -44,8 +47,21 @@ export async function queueEntryReminder(
       fire_at: fireAt.toISOString(),
       sent: false,
     },
-    { onConflict: "user_id,signal_id" }
+    { onConflict: "user_id,signal_id", ignoreDuplicates: true }
   );
+}
+
+// Entry-Reminder aus Queue entfernen (wenn Position eröffnet wird)
+export async function unqueueEntryReminder(signalId: string) {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  const supabase = createClient();
+  await supabase
+    .from("push_queue")
+    .delete()
+    .eq("user_id", userId)
+    .eq("signal_id", `entry-${signalId}`);
 }
 
 // Close-Reminder in Queue eintragen (30 min vor Marktschluss)
@@ -79,7 +95,7 @@ export async function queueCloseReminder(
       fire_at: fireAt.toISOString(),
       sent: false,
     },
-    { onConflict: "user_id,signal_id" }
+    { onConflict: "user_id,signal_id", ignoreDuplicates: true }
   );
 }
 
