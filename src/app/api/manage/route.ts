@@ -94,8 +94,8 @@ export async function GET(request: Request) {
         title = `${trade.asset}: Jetzt schließen (+${profitPercent}%)`;
         body = "Fast am Take-Profit — Trade jetzt schließen und Gewinn mitnehmen.";
       } else if (priceDiff >= slDistance) {
-        title = `${trade.asset}: SL auf Einstand setzen (+${profitPercent}%)`;
-        body = `Trade im Plus. SL auf ${trade.entry.toFixed(2)} setzen — dann ist der Trade risikofrei.`;
+        title = `${trade.asset}: Stoploss ändern (+${profitPercent}%)`;
+        body = `Stoploss auf ${trade.entry.toFixed(2)} setzen — dann ist der Trade risikofrei.`;
       }
 
       if (title && body) {
