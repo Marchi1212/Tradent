@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [notifState, setNotifState] = useState<"unknown" | "granted" | "denied" | "prompt" | "unsupported">("unknown");
   const [openTradeSignals, setOpenTradeSignals] = useState<Set<string>>(new Set());
   const [openTradeCount, setOpenTradeCount] = useState(0);
+  const [investedAmount, setInvestedAmount] = useState(0);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -115,18 +116,24 @@ export default function Dashboard() {
     if (!signals || !portfolio) return;
     async function checkOpenTrades() {
       const openIds = new Set<string>();
+      let todayInvested = 0;
       for (const s of [signals!.steady, signals!.bold]) {
         const trade = await getOpenTradeForSignal(portfolio!.id, s.id);
-        if (trade) openIds.add(s.id);
+        if (trade) {
+          openIds.add(s.id);
+          todayInvested += trade.budget || 0;
+        }
       }
       setOpenTradeSignals(openIds);
 
-      // Alle offenen Trades zählen (für Badge)
+      // Überfällige offene Trades + heutige zusammenzählen
       try {
         const allOpen = await getOpenTrades(portfolio!.id);
         setOpenTradeCount(allOpen.length);
+        const overdueInvested = allOpen.reduce((sum, t) => sum + (t.budget || 0), 0);
+        setInvestedAmount(overdueInvested + todayInvested);
       } catch {
-        // Stille Fehlerbehandlung
+        setInvestedAmount(todayInvested);
       }
     }
     checkOpenTrades();
@@ -211,7 +218,7 @@ export default function Dashboard() {
     ? allocateCapital(portfolio.budget, parseSignalInputs(signals))
     : [0, 0];
 
-  const invested = portfolio ? Math.max(0, portfolio.budget - portfolio.currentBalance) : 0;
+  const totalPnl = portfolio ? (portfolio.currentBalance + investedAmount - portfolio.budget) : 0;
 
   return (
     <>
@@ -225,13 +232,18 @@ export default function Dashboard() {
             <>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
-                {invested > 0 && (
+                {investedAmount > 0 && (
                   <div className="flex items-center gap-1">
                     <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
                     </svg>
-                    <span className="text-sm font-bold text-amber-500">{invested.toFixed(0)}€</span>
+                    <span className="text-sm font-bold text-amber-500">{investedAmount.toFixed(0)}€</span>
                   </div>
+                )}
+                {totalPnl !== 0 && (
+                  <span className={`text-sm font-bold ${totalPnl > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                    {totalPnl > 0 ? "+" : ""}{totalPnl.toFixed(0)}€
+                  </span>
                 )}
               </div>
               <PortfolioHeader
@@ -261,13 +273,18 @@ export default function Dashboard() {
           {portfolio && (
             <div className="flex items-center gap-2.5">
               <span className="text-lg font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
-              {invested > 0 && (
+              {investedAmount > 0 && (
                 <div className="flex items-center gap-1">
                   <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
                   </svg>
-                  <span className="text-lg font-bold text-amber-500">{invested.toFixed(0)}€</span>
+                  <span className="text-lg font-bold text-amber-500">{investedAmount.toFixed(0)}€</span>
                 </div>
+              )}
+              {totalPnl !== 0 && (
+                <span className={`text-lg font-bold ${totalPnl > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                  {totalPnl > 0 ? "+" : ""}{totalPnl.toFixed(0)}€
+                </span>
               )}
             </div>
           )}
