@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   // Cron-geschützte API-Routen brauchen keine Session (haben eigenen CRON_SECRET-Check)
-  const cronRoutes = ["/api/push/send", "/api/evaluate", "/api/revalidate", "/api/signals", "/api/manage"];
+  const cronRoutes = ["/api/push/send", "/api/evaluate", "/api/revalidate", "/api/signals", "/api/manage", "/api/test-scan"];
   if (cronRoutes.some((r) => request.nextUrl.pathname.startsWith(r))) {
     return NextResponse.next({ request });
   }
