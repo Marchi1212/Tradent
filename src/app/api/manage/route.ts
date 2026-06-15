@@ -85,14 +85,25 @@ export async function GET(request: Request) {
       // Mindestens 1x Risk im Plus?
       if (priceDiff >= slDistance) {
         const profitPercent = ((priceDiff / trade.entry) * 100).toFixed(1);
+        const tpDistance = Math.abs(trade.take_profit - trade.entry);
+        const progressToTp = tpDistance > 0 ? priceDiff / tpDistance : 0;
 
-        // Push in Queue eintragen
+        let title: string;
+        let body: string;
+        if (progressToTp >= 0.8) {
+          title = `${trade.asset}: Jetzt schließen (+${profitPercent}%)`;
+          body = "Fast am Take-Profit — Trade jetzt schließen und Gewinn mitnehmen.";
+        } else {
+          title = `${trade.asset}: SL auf Einstand setzen (+${profitPercent}%)`;
+          body = `Trade im Plus. SL auf ${trade.entry.toFixed(2)} setzen — dann ist der Trade risikofrei.`;
+        }
+
         await supabase.from("push_queue").upsert(
           {
             user_id: trade.user_id,
             signal_id: `manage-${trade.id}`,
-            title: `${trade.asset} im Plus (+${profitPercent}%)`,
-            body: "Teilgewinn sichern? Dein Trade hat das 1x-Risk-Ziel erreicht.",
+            title,
+            body,
             fire_at: new Date().toISOString(),
             sent: false,
           },
