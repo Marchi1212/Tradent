@@ -526,9 +526,13 @@ Erstelle eine Shortlist von 4-6 Kandidaten. Antworte NUR mit JSON.`,
 
   let parsed: { candidates: ScanCandidate[] };
   try {
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+    let jsonText = textBlock.text;
+    const codeBlock = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlock) jsonText = codeBlock[1];
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Kein JSON");
-    parsed = JSON.parse(jsonMatch[0]);
+    const cleaned = jsonMatch[0].replace(/,\s*([}\]])/g, "$1");
+    parsed = JSON.parse(cleaned);
   } catch (err) {
     console.error("Claude Scan-Antwort:", textBlock.text);
     throw new Error(`JSON-Parsing fehlgeschlagen: ${err}`);
@@ -672,9 +676,13 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
 
   let parsed: { steady: GeneratedSignal; bold: GeneratedSignal };
   try {
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+    let jsonText = textBlock.text;
+    const codeBlock = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlock) jsonText = codeBlock[1];
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Kein JSON in der Antwort gefunden");
-    parsed = JSON.parse(jsonMatch[0]);
+    const cleaned = jsonMatch[0].replace(/,\s*([}\]])/g, "$1");
+    parsed = JSON.parse(cleaned);
   } catch (err) {
     console.error("Claude Antwort:", textBlock.text);
     throw new Error(`JSON-Parsing fehlgeschlagen: ${err}`);
