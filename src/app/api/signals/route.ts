@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTodaySignals, saveTodaySignals, todaySignalsExist } from "@/lib/signal-store";
+import { getTodaySignals, saveTodaySignals, todaySignalsExist, getScanCandidates } from "@/lib/signal-store";
 import { generateSignals } from "@/lib/signal-generator";
 import { getTradingDayType } from "@/lib/market-hours";
 
@@ -7,46 +7,64 @@ export const maxDuration = 60;
 
 export async function GET() {
   try {
-    // 1. Prüfen ob heute schon Signale existieren
+    // 1. Prüfen ob heute schon finale Signale existieren
     const existing = await getTodaySignals();
     if (existing) {
       return NextResponse.json({ signals: existing });
     }
 
-    // 2. Mindest-Zeitpunkt prüfen (Performance: Markt muss erst anlaufen)
+    // 2. Zeitpunkt + Tagestyp prüfen
     const now = new Date();
     const cetStr = now.toLocaleString("en-US", { timeZone: "Europe/Berlin" });
     const cet = new Date(cetStr);
     const currentMinutes = cet.getHours() * 60 + cet.getMinutes();
     const dayType = getTradingDayType(cet);
     const isWeekendDay = dayType === "weekend";
-    // WE: 08:00, Feiertage: 08:30 (weniger Märkte, schneller bereit), Werktag: 09:15
-    const minMinutes = isWeekendDay ? 8 * 60
-      : dayType === "weekday" ? 9 * 60 + 15
-      : 8 * 60 + 30;
+
+    // Wochentag: Zwei-Stufen-System — finale Signale erst ab 13:30
+    // WE: 08:00, Feiertage: 08:30 (Single-Generierung wie bisher)
+    let minMinutes: number;
+    if (dayType === "weekday") {
+      minMinutes = 13 * 60 + 30; // 13:30 CET
+    } else if (isWeekendDay) {
+      minMinutes = 8 * 60; // 08:00
+    } else {
+      minMinutes = 8 * 60 + 30; // 08:30 (Feiertage)
+    }
 
     if (currentMinutes < minMinutes) {
-      const waitUntil = isWeekendDay ? "08:00" : dayType === "weekday" ? "09:15" : "08:30";
+      const waitUntil = dayType === "weekday" ? "13:30"
+        : isWeekendDay ? "08:00" : "08:30";
       return NextResponse.json({ waitUntil, isWeekend: isWeekendDay });
     }
 
-    // 3. Noch keine Signale → generieren
-    console.log("Keine Signale für heute. Generiere aus 47 Assets...");
-
-    // Double-Check gegen Race Conditions
+    // 3. Double-Check gegen Race Conditions
     const exists = await todaySignalsExist();
     if (exists) {
       const signals = await getTodaySignals();
       return NextResponse.json({ signals });
     }
 
-    // 3. Claude API + Marktdaten (alle 47 Assets)
-    const generated = await generateSignals();
+    // 4. An Wochentagen: Shortlist aus Morgen-Scan nutzen
+    let shortlist = undefined;
+    if (dayType === "weekday") {
+      const candidates = await getScanCandidates();
+      if (candidates && candidates.length >= 2) {
+        shortlist = candidates;
+        console.log(`Shortlist aus Morgen-Scan: ${candidates.map(c => c.asset).join(", ")}`);
+      } else {
+        console.log("Kein Morgen-Scan vorhanden — generiere aus allen Assets");
+      }
+    }
 
-    // 4. Speichern
+    // 5. Claude API + Marktdaten
+    console.log("Generiere finale Signale...");
+    const generated = await generateSignals(shortlist);
+
+    // 6. Speichern
     await saveTodaySignals(generated);
 
-    // 5. Gespeicherte Signale zurückgeben
+    // 7. Gespeicherte Signale zurückgeben
     const saved = await getTodaySignals();
     return NextResponse.json({ signals: saved });
   } catch (err) {

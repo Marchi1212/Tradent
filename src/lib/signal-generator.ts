@@ -365,6 +365,133 @@ ${instruction} Antworte NUR mit diesem JSON:
 }`;
 }
 
+// ── Pre-Analysis Prompt (Morgen-Scan) ──────────────────
+
+const SYSTEM_PROMPT_SCAN = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Deine Aufgabe: erstelle eine SHORTLIST von 4-6 Kandidaten für den heutigen Handelstag. KEINE finalen Signale — nur eine Vorauswahl.
+
+═══ ENTSCHEIDUNGSBAUM ═══
+
+SCHRITT 1 — FILTER (Assets eliminieren):
+- RSI14 zwischen 45-55 → eliminieren
+- ATR14% < 0.3% → eliminieren
+- Earnings HEUTE oder MORGEN → eliminieren
+- NEWS-VETO aktiv → eliminieren
+
+SCHRITT 2 — RICHTUNG bestimmen:
+- RSI14 < 35 UND Kurs < SMA20 → LONG-Tendenz
+- RSI14 > 65 UND Kurs > SMA20 → SHORT-Tendenz
+- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG-Tendenz
+- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT-Tendenz
+
+SCHRITT 3 — VORLÄUFIGE KONFIDENZ (Basis 60%):
++10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
++5% Support/Resistance | -10% gegen SMA20
+-20% High-Impact Event heute | -10% F&G Kontraindikator | +5% F&G für Richtung
+→ Begrenzen auf 40-95%.
+
+SCHRITT 4 — TOP 4-6 nach Konfidenz auswählen
+- Mindestens 1 SHORT dabei wenn möglich
+- Verschiedene Asset-Klassen bevorzugen
+
+Antworte NUR mit JSON:
+{
+  "candidates": [
+    {
+      "asset": "Name",
+      "ticker": "XTB-Ticker",
+      "category": "Index",
+      "market": "XETRA",
+      "direction": "LONG",
+      "confidence": 72,
+      "note": "RSI 32 + unter SMA20, überverkauft. ATR 1.2%."
+    }
+  ]
+}`;
+
+export interface ScanCandidate {
+  asset: string;
+  ticker: string;
+  category: string;
+  market: string;
+  direction: "LONG" | "SHORT";
+  confidence: number;
+  note: string;
+}
+
+export async function generatePreAnalysis(): Promise<ScanCandidate[]> {
+  const dayType = getTradingDayType();
+  console.log("Morgen-Scan: Pre-Analysis wird generiert...");
+
+  const [marketData, marketContext, newsContext] = await Promise.all([
+    fetchMarketDataForDayType(dayType),
+    fetchMarketContext(),
+    fetchNewsContext(),
+  ]);
+
+  if (newsContext) {
+    console.log(`Live-News geladen: ${newsContext.headlines.length} Meldungen`);
+  }
+
+  const minAssets = dayType === "weekend" ? 3 : dayType === "double_holiday" ? 8 : 5;
+  if (marketData.length < minAssets) {
+    throw new Error(`Zu wenig Marktdaten (${marketData.length}). Mindestens ${minAssets} benötigt.`);
+  }
+
+  console.log(`${marketData.length} Assets geladen. Pre-Analysis via Claude...`);
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const today = new Date().toLocaleDateString("de-DE", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
+  const formattedData = formatMarketDataForPrompt(marketData);
+  const formattedContext = formatMarketContextForPrompt(marketContext);
+  const exchangeNotes = getExchangeNotes();
+  const newsBlock = newsContext?.raw
+    ? `\nLIVE-NEWS (letzte 12h) — NEWS hat VETO-Recht:\n${newsContext.raw}\n`
+    : "";
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1000,
+    system: SYSTEM_PROMPT_SCAN,
+    messages: [{
+      role: "user",
+      content: `Datum: ${today}
+
+${formattedContext}
+${newsBlock}
+Marktdaten:
+
+${formattedData}
+
+Erstelle eine Shortlist von 4-6 Kandidaten. Antworte NUR mit JSON.`,
+    }],
+  });
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Keine Text-Antwort von Claude erhalten");
+  }
+
+  let parsed: { candidates: ScanCandidate[] };
+  try {
+    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Kein JSON");
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.error("Claude Scan-Antwort:", textBlock.text);
+    throw new Error(`JSON-Parsing fehlgeschlagen: ${err}`);
+  }
+
+  if (!parsed.candidates || parsed.candidates.length < 2) {
+    throw new Error("Weniger als 2 Kandidaten in der Pre-Analysis");
+  }
+
+  console.log(`Pre-Analysis: ${parsed.candidates.length} Kandidaten — ${parsed.candidates.map(c => c.asset).join(", ")}`);
+  return parsed.candidates;
+}
+
 // Marktdaten je nach Tagestyp laden
 async function fetchMarketDataForDayType(dayType: TradingDayType): Promise<AssetMarketData[]> {
   if (dayType === "weekend") {
@@ -401,7 +528,7 @@ async function fetchMarketDataForDayType(dayType: TradingDayType): Promise<Asset
   return combined;
 }
 
-export async function generateSignals(): Promise<{
+export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
   steady: GeneratedSignal;
   bold: GeneratedSignal;
 }> {
@@ -418,7 +545,7 @@ export async function generateSignals(): Promise<{
   console.log(`Modus: ${modeLabel}`);
 
   // 1. Marktdaten + Kontext + News parallel laden
-  const [marketData, marketContext, newsContext] = await Promise.all([
+  const [allMarketData, marketContext, newsContext] = await Promise.all([
     fetchMarketDataForDayType(dayType),
     fetchMarketContext(),
     fetchNewsContext(),
@@ -426,6 +553,14 @@ export async function generateSignals(): Promise<{
 
   if (newsContext) {
     console.log(`Live-News geladen: ${newsContext.headlines.length} Meldungen`);
+  }
+
+  // Bei Shortlist: nur relevante Assets an Claude senden (frische Daten für alle geladen)
+  let marketData = allMarketData;
+  if (shortlist && shortlist.length > 0) {
+    const shortlistTickers = new Set(shortlist.map(c => c.ticker));
+    marketData = allMarketData.filter(d => shortlistTickers.has(d.ticker));
+    console.log(`Shortlist-Modus: ${marketData.length} von ${allMarketData.length} Assets an Claude`);
   }
 
   // Kontext loggen
@@ -503,8 +638,8 @@ export async function generateSignals(): Promise<{
   parsed.bold.riskClass = "bold";
 
   // SL-Mindestabstände erzwingen (ATR-basiert, Fallback auf feste %)
-  enforceMinSlDistance(parsed.steady, marketData);
-  enforceMinSlDistance(parsed.bold, marketData);
+  enforceMinSlDistance(parsed.steady, allMarketData);
+  enforceMinSlDistance(parsed.bold, allMarketData);
 
   console.log(
     `Signale generiert: ${parsed.steady.asset} (Steady, ${parsed.steady.market}) + ${parsed.bold.asset} (Bold, ${parsed.bold.market})`

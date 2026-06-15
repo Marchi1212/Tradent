@@ -21,6 +21,16 @@ import {
 } from "@/lib/notifications";
 import { queueEntryReminder } from "@/lib/push-queue";
 
+interface ScanCandidate {
+  asset: string;
+  ticker: string;
+  category: string;
+  market: string;
+  direction: "LONG" | "SHORT";
+  confidence: number;
+  note: string;
+}
+
 type Tab = "signals" | "trades";
 
 function parseSignalInputs(signals: { steady: Signal; bold: Signal }) {
@@ -53,6 +63,7 @@ export default function Dashboard() {
   const [openTradeSignals, setOpenTradeSignals] = useState<Set<string>>(new Set());
   const [openTradeCount, setOpenTradeCount] = useState(0);
   const [investedAmount, setInvestedAmount] = useState(0);
+  const [scanCandidates, setScanCandidates] = useState<ScanCandidate[] | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -79,11 +90,26 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.waitUntil) {
         setSignalsWaitUntil(data.waitUntil);
+        // Wenn Signale warten (Wochentag vor 13:30): Scan-Kandidaten laden
+        if (data.waitUntil === "13:30") {
+          try {
+            const scanRes = await fetch("/api/signals/scan");
+            if (scanRes.ok) {
+              const scanData = await scanRes.json();
+              if (scanData.candidates) {
+                setScanCandidates(scanData.candidates);
+              }
+            }
+          } catch {
+            // Scan-Fehler ist nicht kritisch
+          }
+        }
         return;
       }
       if (data.signals?.steady && data.signals?.bold) {
         setSignals(data.signals);
         setSignalsWaitUntil(null);
+        setScanCandidates(null);
       } else if (data.error) {
         throw new Error(data.error);
       }
@@ -386,17 +412,52 @@ export default function Dashboard() {
                         ? "US, Forex, Rohstoffe & Krypto werden analysiert."
                         : isNYSEHoliday()
                           ? "EU, Forex, Rohstoffe & Krypto werden analysiert."
-                          : "55 Assets werden analysiert."}{" "}
+                          : "Marktdaten werden analysiert."}{" "}
                   Das kann bis zu 30 Sekunden dauern.
                 </p>
               </div>
             ) : signalsWaitUntil ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <p className="text-2xl mb-4">⏳</p>
-                <p className="text-sm font-semibold text-text-primary">Neue Signale ab {signalsWaitUntil} Uhr</p>
-                <p className="text-xs text-text-muted mt-1">
-                  Die Märkte müssen erst anlaufen, damit die Analyse zuverlässig ist.
-                </p>
+              <div className="space-y-4">
+                {scanCandidates && scanCandidates.length > 0 ? (
+                  <>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-text-primary">Heute im Fokus</p>
+                      <p className="text-xs text-text-muted mt-1">
+                        Finale Signale ab {signalsWaitUntil} Uhr — London-NY-Overlap
+                      </p>
+                    </div>
+                    {scanCandidates.map((c, i) => (
+                      <div key={i} className="rounded-[12px] bg-bg-secondary px-4 py-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-text-primary">{c.asset}</span>
+                            <span className="text-xs text-text-muted">{c.ticker}</span>
+                          </div>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            c.direction === "LONG"
+                              ? "bg-emerald-500/10 text-emerald-500"
+                              : "bg-red-500/10 text-red-500"
+                          }`}>
+                            {c.direction}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-text-muted mb-2">
+                          <span>{c.category}</span>
+                          <span>{c.market}</span>
+                          <span>Konfidenz: {c.confidence}%</span>
+                        </div>
+                        <p className="text-xs text-text-muted">{c.note}</p>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <p className="text-sm font-semibold text-text-primary">Neue Signale ab {signalsWaitUntil} Uhr</p>
+                    <p className="text-xs text-text-muted mt-1">
+                      Die Märkte müssen erst anlaufen, damit die Analyse zuverlässig ist.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : signalsError ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">

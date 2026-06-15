@@ -1,4 +1,5 @@
 import type { Signal } from "./mock-signals";
+import type { ScanCandidate } from "./signal-generator";
 
 async function getServerClient() {
   const { createClient } = await import("@/lib/supabase/server");
@@ -131,4 +132,74 @@ export async function saveTodaySignals(signals: {
 
   const { error } = await supabase.from("signals").insert(rows);
   if (error) throw error;
+}
+
+// ── Scan-Kandidaten (Pre-Analysis) ──────────────────
+
+export async function saveScanCandidates(candidates: ScanCandidate[]): Promise<void> {
+  const supabase = await getServerClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const rows = candidates.map((c, i) => ({
+    date: today,
+    session: "scan",
+    risk_class: `candidate_${i}`,
+    asset: c.asset,
+    ticker: c.ticker,
+    direction: c.direction,
+    leverage: "–",
+    entry: 0,
+    stop_loss: 0,
+    take_profit: 0,
+    confidence: c.confidence,
+    expected_gain_percent: 0,
+    risk_reward_ratio: "–",
+    reasoning: c.note,
+    market: c.market,
+    market_close_time: "",
+    optimal_entry: "",
+    category: c.category,
+  }));
+
+  const { error } = await supabase.from("signals").insert(rows);
+  if (error) throw error;
+}
+
+export async function getScanCandidates(): Promise<ScanCandidate[] | null> {
+  const supabase = await getServerClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("signals")
+    .select("*")
+    .eq("date", today)
+    .eq("session", "scan")
+    .order("confidence", { ascending: false });
+
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+
+  return data.map((row: Record<string, unknown>) => ({
+    asset: row.asset as string,
+    ticker: row.ticker as string,
+    category: row.category as string,
+    market: row.market as string,
+    direction: row.direction as "LONG" | "SHORT",
+    confidence: Number(row.confidence),
+    note: row.reasoning as string,
+  }));
+}
+
+export async function scanCandidatesExist(): Promise<boolean> {
+  const supabase = await getServerClient();
+  const today = new Date().toISOString().split("T")[0];
+
+  const { count, error } = await supabase
+    .from("signals")
+    .select("*", { count: "exact", head: true })
+    .eq("date", today)
+    .eq("session", "scan");
+
+  if (error) return false;
+  return (count ?? 0) >= 2;
 }
