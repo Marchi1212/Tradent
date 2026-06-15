@@ -269,8 +269,8 @@ export default function Dashboard() {
     if (openTradeCount > 0) {
       if (mins >= 22 * 60) {
         return {
-          now: { label: "Trade offen", color: "orange" },
-          next: { label: "Jetzt schließen", color: "orange" },
+          now: { label: "Trade offen", color: "action" },
+          next: { label: "Jetzt schließen", color: "action" },
         };
       }
       const nextCheck30 = Math.ceil((mins + 1) / 30) * 30;
@@ -278,12 +278,12 @@ export default function Dashboard() {
       const nextM = nextCheck30 % 60;
       if (mins >= 21 * 60 + 30) {
         return {
-          now: { label: "Trade läuft", color: "green" },
-          next: { label: "Schließen um 22:00", color: "orange" },
+          now: { label: "Trade läuft", color: "active" },
+          next: { label: "Schließen um 22:00", color: "action" },
         };
       }
       return {
-        now: { label: "Trade läuft", color: "green" },
+        now: { label: "Trade läuft", color: "active" },
         next: { label: `Nächster Check ${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`, color: "grey" },
       };
     }
@@ -294,8 +294,8 @@ export default function Dashboard() {
         (signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id));
       if (hasVisibleSignal) {
         return {
-          now: { label: "Signale verfügbar", color: "green" },
-          next: { label: "Trade öffnen", color: "orange" },
+          now: { label: "Signale verfügbar", color: "active" },
+          next: { label: "Trade öffnen", color: "action" },
         };
       }
       return {
@@ -306,7 +306,7 @@ export default function Dashboard() {
 
     if (signalsLoading) {
       return {
-        now: { label: "Signale werden erstellt…", color: "green" },
+        now: { label: "Signale werden erstellt…", color: "active" },
         next: { label: "Trade öffnen", color: "grey" },
       };
     }
@@ -314,7 +314,7 @@ export default function Dashboard() {
     if (signalsWaitUntil) {
       if (scanCandidates && scanCandidates.length > 0) {
         return {
-          now: { label: "Scan abgeschlossen", color: "green" },
+          now: { label: "Scan abgeschlossen", color: "active" },
           next: { label: `Signale um ${signalsWaitUntil}`, color: "grey" },
         };
       }
@@ -343,10 +343,10 @@ export default function Dashboard() {
 
   const statusBar = getStatusBar();
 
-  const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-    grey: { bg: "bg-white/5", text: "text-text-muted", dot: "bg-white/20" },
-    green: { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-400" },
-    orange: { bg: "bg-amber-500/10", text: "text-amber-400", dot: "bg-amber-400" },
+  const statusStyles: Record<string, { wrapper: string; text: string; dot: string }> = {
+    grey: { wrapper: "", text: "text-text-muted", dot: "bg-text-muted/40" },
+    active: { wrapper: "bg-text-primary rounded-[10px]", text: "text-white", dot: "bg-white animate-pulse" },
+    action: { wrapper: "bg-text-primary rounded-[10px]", text: "text-white", dot: "bg-amber-400 animate-pulse" },
   };
 
   return (
@@ -441,7 +441,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            Today
+            Heute
           </button>
           <button
             onClick={() => setActiveTab("trades")}
@@ -451,7 +451,7 @@ export default function Dashboard() {
                 : "text-text-muted"
             }`}
           >
-            Trades
+            Verlauf
             {openTradeCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center px-1">
                 {openTradeCount}
@@ -472,22 +472,28 @@ export default function Dashboard() {
 
       {/* Status Bar */}
       {statusBar && (
-        <div className="px-5 w-full max-w-lg mx-auto">
-          <div className="flex gap-2">
-            <div className={`flex-1 flex items-center gap-2 rounded-[10px] px-3 py-2 ${statusColors[statusBar.now.color].bg}`}>
-              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusColors[statusBar.now.color].dot} ${statusBar.now.color === "green" ? "animate-pulse" : ""}`} />
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">Jetzt</p>
-                <p className={`text-xs font-semibold ${statusColors[statusBar.now.color].text}`}>{statusBar.now.label}</p>
+        <div className="px-5 w-full max-w-lg mx-auto pt-2">
+          <div className="rounded-[12px] border border-border bg-bg-secondary overflow-hidden">
+            <div className="flex">
+              {/* JETZT */}
+              <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 ${statusStyles[statusBar.now.color].wrapper}`}>
+                <div className={`w-2 h-2 rounded-full shrink-0 ${statusStyles[statusBar.now.color].dot}`} />
+                <div className="min-w-0">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${statusBar.now.color === "grey" ? "text-text-muted/50" : "text-white/50"}`}>Jetzt</p>
+                  <p className={`text-sm font-bold truncate ${statusStyles[statusBar.now.color].text}`}>{statusBar.now.label}</p>
+                </div>
               </div>
-            </div>
-            <div className={`flex-1 flex items-center gap-2 rounded-[10px] px-3 py-2 ${statusColors[statusBar.next.color].bg}`}>
-              <svg className={`w-3 h-3 shrink-0 ${statusColors[statusBar.next.color].text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted/60">Als Nächstes</p>
-                <p className={`text-xs font-semibold ${statusColors[statusBar.next.color].text}`}>{statusBar.next.label}</p>
+              {/* Trennlinie */}
+              <div className="w-px bg-border self-stretch" />
+              {/* ALS NÄCHSTES */}
+              <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 ${statusStyles[statusBar.next.color].wrapper}`}>
+                <svg className={`w-3.5 h-3.5 shrink-0 ${statusStyles[statusBar.next.color].text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                <div className="min-w-0">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${statusBar.next.color === "grey" ? "text-text-muted/50" : "text-white/50"}`}>Nächster Schritt</p>
+                  <p className={`text-sm font-bold truncate ${statusStyles[statusBar.next.color].text}`}>{statusBar.next.label}</p>
+                </div>
               </div>
             </div>
           </div>
