@@ -692,6 +692,31 @@ export default function SignalCard({
                     <CopyableValue label="Stop-Loss" value={String(signal.stopLoss)} displayValue={signal.stopLoss.toLocaleString("de-DE")} />
                     <CopyableValue label="Take-Profit" value={String(signal.takeProfit)} displayValue={signal.takeProfit.toLocaleString("de-DE")} />
                   </div>
+                  {/* Stoploss-Empfehlung wenn Trade ≥1x Risk im Plus */}
+                  {livePnl && (() => {
+                    const slDistance = Math.abs(signal.entry - signal.stopLoss);
+                    const priceDiff = signal.direction === "LONG"
+                      ? livePnl.currentPrice - signal.entry
+                      : signal.entry - livePnl.currentPrice;
+                    if (priceDiff >= slDistance) {
+                      const tpDistance = Math.abs(signal.takeProfit - signal.entry);
+                      const progressToTp = tpDistance > 0 ? priceDiff / tpDistance : 0;
+                      if (progressToTp >= 0.8) {
+                        return (
+                          <div className="bg-green-500/20 border border-green-500/40 rounded-lg px-3 py-2">
+                            <p className="text-green-400 text-sm font-semibold">Jetzt schließen — fast am Take-Profit</p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="bg-green-500/20 border border-green-500/40 rounded-lg px-3 py-2">
+                          <p className="text-green-400 text-sm font-semibold">Stoploss anpassen auf:</p>
+                          <CopyableValue label="" value={String(signal.entry)} displayValue={signal.entry.toLocaleString("de-DE")} />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               ) : (
                 <div className="grid grid-cols-3 gap-3">
