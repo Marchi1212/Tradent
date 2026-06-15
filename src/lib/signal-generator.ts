@@ -375,7 +375,7 @@ Marktdaten:
 
 ${marketData}
 
-${instruction} Antworte NUR mit diesem JSON:
+${instruction} Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text davor oder danach:
 
 {
   "steady": {
@@ -419,6 +419,8 @@ ${instruction} Antworte NUR mit diesem JSON:
 
 const SYSTEM_PROMPT_SCAN = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Deine Aufgabe: erstelle eine SHORTLIST von 4-6 Kandidaten für den heutigen Handelstag. KEINE finalen Signale — nur eine Vorauswahl.
 
+WICHTIG: Antworte NUR mit validem JSON. Kein Markdown, keine Code-Blöcke, kein Text davor oder danach.
+
 ═══ ENTSCHEIDUNGSBAUM ═══
 
 SCHRITT 1 — FILTER (Assets eliminieren):
@@ -443,7 +445,7 @@ SCHRITT 4 — TOP 4-6 nach Konfidenz auswählen
 - Mindestens 1 SHORT dabei wenn möglich
 - Verschiedene Asset-Klassen bevorzugen
 
-Antworte NUR mit JSON:
+Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text davor oder danach:
 {
   "candidates": [
     {
