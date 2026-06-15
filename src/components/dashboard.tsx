@@ -465,11 +465,64 @@ export default function Dashboard() {
                     ))}
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <p className="text-sm font-semibold text-text-primary">Neue Signale ab {signalsWaitUntil} Uhr</p>
-                    <p className="text-xs text-text-muted mt-1">
-                      Die Märkte müssen erst anlaufen, damit die Analyse zuverlässig ist.
-                    </p>
+                  <div className="rounded-[12px] bg-bg-secondary px-5 py-6">
+                    {/* Timeline */}
+                    <div className="relative flex items-center justify-between mb-6">
+                      {/* Line through */}
+                      <div className="absolute left-[10%] right-[10%] top-1/2 h-[2px] bg-white/10" />
+                      <div className="absolute left-[10%] top-1/2 h-[2px] bg-accent transition-all" style={{
+                        width: (() => {
+                          const now = new Date();
+                          const cet = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+                          const mins = cet.getHours() * 60 + cet.getMinutes();
+                          const start = 9 * 60 + 15;
+                          const end = 14 * 60;
+                          const progress = Math.max(0, Math.min(1, (mins - start) / (end - start)));
+                          return `${progress * 80}%`;
+                        })()
+                      }} />
+
+                      {/* Step 1: Scan */}
+                      <div className="relative z-10 flex flex-col items-center" style={{ width: "33%" }}>
+                        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center mb-2">
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <p className="text-xs font-semibold text-accent">09:15</p>
+                        <p className="text-[11px] text-text-muted mt-0.5">Scan</p>
+                      </div>
+
+                      {/* Step 2: Signale */}
+                      <div className="relative z-10 flex flex-col items-center" style={{ width: "33%" }}>
+                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center mb-2 animate-pulse">
+                          <svg className="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <p className="text-xs font-semibold text-text-primary">{signalsWaitUntil}</p>
+                        <p className="text-[11px] text-text-muted mt-0.5">Signale</p>
+                      </div>
+
+                      {/* Step 3: Trade */}
+                      <div className="relative z-10 flex flex-col items-center" style={{ width: "33%" }}>
+                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center mb-2">
+                          <svg className="w-4 h-4 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+                          </svg>
+                        </div>
+                        <p className="text-xs font-semibold text-white/30">14:00+</p>
+                        <p className="text-[11px] text-white/20 mt-0.5">Trade</p>
+                      </div>
+                    </div>
+
+                    {/* Status text */}
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-text-primary">Märkte laufen an...</p>
+                      <p className="text-xs text-text-muted mt-1">
+                        Finale Signale werden um {signalsWaitUntil} Uhr mit frischen Daten erstellt.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
