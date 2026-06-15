@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Signal } from "@/lib/mock-signals";
-import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, getOpenTrades, type Portfolio } from "@/lib/portfolio-store";
+import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, getOpenTrades, getRiskMultiplier, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
@@ -64,6 +64,7 @@ export default function Dashboard() {
   const [openTradeCount, setOpenTradeCount] = useState(0);
   const [investedAmount, setInvestedAmount] = useState(0);
   const [scanCandidates, setScanCandidates] = useState<ScanCandidate[] | null>(null);
+  const [riskMultiplier, setRiskMultiplier] = useState(1.0);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -136,6 +137,12 @@ export default function Dashboard() {
       else setNotifState("prompt"); // "default" → show prompt
     });
   }, []);
+
+  // Risiko-Bremse prüfen
+  useEffect(() => {
+    if (!portfolio) return;
+    getRiskMultiplier(portfolio.id).then(setRiskMultiplier);
+  }, [portfolio]);
 
   // Offene Trades prüfen (damit Karten trotz niedriger Konfidenz sichtbar bleiben)
   useEffect(() => {
@@ -240,9 +247,10 @@ export default function Dashboard() {
 
   // Allokation basiert auf Original-Budget (nicht currentBalance),
   // damit die Aufteilung fix bleibt wenn Position 1 schon offen ist
-  const allocations = portfolio && signals
+  const rawAllocations = portfolio && signals
     ? allocateCapital(portfolio.budget, parseSignalInputs(signals))
     : [0, 0];
+  const allocations = rawAllocations.map(a => Math.floor(a * riskMultiplier));
 
   const totalPnl = portfolio ? (portfolio.currentBalance + investedAmount - portfolio.budget) : 0;
 
@@ -398,6 +406,12 @@ export default function Dashboard() {
                   <p className="text-xs text-text-muted">Einstiegsfenster & Schließen-Erinnerung</p>
                 </div>
               </button>
+            )}
+            {riskMultiplier < 1.0 && (
+              <div className="rounded-[12px] bg-amber-500/10 border border-amber-500/30 px-4 py-3">
+                <p className="text-sm font-semibold text-amber-500">Risiko-Bremse aktiv</p>
+                <p className="text-xs text-amber-500/80 mt-0.5">3 Verluste in Folge — Positionen halbiert bis zum nächsten Gewinn.</p>
+              </div>
             )}
             {signalsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">

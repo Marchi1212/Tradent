@@ -13,25 +13,37 @@ export interface WatchlistAsset {
 }
 
 export const WATCHLIST: WatchlistAsset[] = [
-  // ── Indizes (8) ──
+  // ── Indizes (10) ──
   { symbol: "^GDAXI", name: "DAX 40", ticker: "DE40", category: "Index", market: "XETRA", sessions: ["eu"] },
   { symbol: "^FTSE", name: "FTSE 100", ticker: "UK100", category: "Index", market: "LSE", sessions: ["eu"] },
   { symbol: "^FCHI", name: "CAC 40", ticker: "FRA40", category: "Index", market: "XETRA", sessions: ["eu"] },
   { symbol: "^STOXX50E", name: "Euro Stoxx 50", ticker: "EU50", category: "Index", market: "XETRA", sessions: ["eu"] },
   { symbol: "^N225", name: "Nikkei 225", ticker: "JAP225", category: "Index", market: "JPX", sessions: ["eu"] },
+  { symbol: "^HSI", name: "Hang Seng", ticker: "HKComp", category: "Index", market: "JPX", sessions: ["eu"] },
   { symbol: "^GSPC", name: "S&P 500", ticker: "US500", category: "Index", market: "NYSE", sessions: ["us"] },
   { symbol: "^NDX", name: "NASDAQ 100", ticker: "US100", category: "Index", market: "NYSE", sessions: ["us"] },
   { symbol: "^DJI", name: "Dow Jones", ticker: "US30", category: "Index", market: "NYSE", sessions: ["us"] },
+  { symbol: "^RUT", name: "Russell 2000", ticker: "US2000", category: "Index", market: "NYSE", sessions: ["us"] },
 
-  // ── EU-Aktien (6) – XETRA Börsenzeiten ──
+  // ── EU-Aktien (16) – XETRA Börsenzeiten ──
   { symbol: "SAP.DE", name: "SAP", ticker: "SAP.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
   { symbol: "SIE.DE", name: "Siemens", ticker: "SIE.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
   { symbol: "ASML.AS", name: "ASML", ticker: "ASML.NL", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
   { symbol: "MC.PA", name: "LVMH", ticker: "LVMH.FR", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
   { symbol: "VOW3.DE", name: "Volkswagen", ticker: "VOW.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
   { symbol: "DBK.DE", name: "Deutsche Bank", ticker: "DBK.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "BMW.DE", name: "BMW", ticker: "BMW.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "AIR.PA", name: "Airbus", ticker: "AIR.FR", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "TTE.PA", name: "TotalEnergies", ticker: "TTE.FR", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "NESN.SW", name: "Nestlé", ticker: "NESN.CH", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "ALV.DE", name: "Allianz", ticker: "ALV.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "BAS.DE", name: "BASF", ticker: "BAS.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "DTE.DE", name: "Deutsche Telekom", ticker: "DTE.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "SAN.PA", name: "Sanofi", ticker: "SAN.FR", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "OR.PA", name: "L'Oréal", ticker: "ORP.FR", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
+  { symbol: "BAYN.DE", name: "Bayer", ticker: "BAYN.DE", category: "Aktie", market: "XETRA_STOCK", sessions: ["eu"] },
 
-  // ── US-Aktien (15) – NYSE Börsenzeiten ──
+  // ── US-Aktien (25) – NYSE Börsenzeiten ──
   { symbol: "TSLA", name: "Tesla", ticker: "TSLA.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
   { symbol: "NVDA", name: "Nvidia", ticker: "NVDA.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
   { symbol: "AAPL", name: "Apple", ticker: "AAPL.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
@@ -47,8 +59,18 @@ export const WATCHLIST: WatchlistAsset[] = [
   { symbol: "GS", name: "Goldman Sachs", ticker: "GS.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
   { symbol: "DIS", name: "Disney", ticker: "DIS.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
   { symbol: "KO", name: "Coca-Cola", ticker: "KO.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "AVGO", name: "Broadcom", ticker: "AVGO.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "PLTR", name: "Palantir", ticker: "PLTR.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "UBER", name: "Uber", ticker: "UBER.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "CRM", name: "Salesforce", ticker: "CRM.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "V", name: "Visa", ticker: "V.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "XOM", name: "Exxon Mobil", ticker: "XOM.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "PFE", name: "Pfizer", ticker: "PFE.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "ABNB", name: "Airbnb", ticker: "ABNB.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "COIN", name: "Coinbase", ticker: "COIN.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
+  { symbol: "SNAP", name: "Snap", ticker: "SNAP.US", category: "Aktie", market: "NYSE_STOCK", sessions: ["us"] },
 
-  // ── Forex (8) – beide Runden ──
+  // ── Forex (14) – beide Runden ──
   { symbol: "EURUSD=X", name: "EUR/USD", ticker: "EURUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
   { symbol: "GBPUSD=X", name: "GBP/USD", ticker: "GBPUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
   { symbol: "USDJPY=X", name: "USD/JPY", ticker: "USDJPY", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
@@ -57,14 +79,24 @@ export const WATCHLIST: WatchlistAsset[] = [
   { symbol: "AUDUSD=X", name: "AUD/USD", ticker: "AUDUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
   { symbol: "USDCAD=X", name: "USD/CAD", ticker: "USDCAD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
   { symbol: "NZDUSD=X", name: "NZD/USD", ticker: "NZDUSD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "EURJPY=X", name: "EUR/JPY", ticker: "EURJPY", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "GBPJPY=X", name: "GBP/JPY", ticker: "GBPJPY", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "EURCHF=X", name: "EUR/CHF", ticker: "EURCHF", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "AUDJPY=X", name: "AUD/JPY", ticker: "AUDJPY", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "CADJPY=X", name: "CAD/JPY", ticker: "CADJPY", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
+  { symbol: "EURAUD=X", name: "EUR/AUD", ticker: "EURAUD", category: "Forex", market: "Forex", sessions: ["eu", "us"] },
 
-  // ── Rohstoffe (6) – beide Runden ──
+  // ── Rohstoffe (10) – beide Runden ──
   { symbol: "GC=F", name: "Gold", ticker: "GOLD", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
   { symbol: "SI=F", name: "Silber", ticker: "SILVER", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
   { symbol: "PL=F", name: "Platin", ticker: "PLATINUM", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
+  { symbol: "HG=F", name: "Kupfer", ticker: "COPPER", category: "Rohstoff", market: "COMEX", sessions: ["eu", "us"] },
   { symbol: "CL=F", name: "Öl (WTI)", ticker: "OIL.WTI", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
   { symbol: "BZ=F", name: "Öl (Brent)", ticker: "OIL", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
   { symbol: "NG=F", name: "Erdgas", ticker: "NATGAS", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
+  { symbol: "ZW=F", name: "Weizen", ticker: "WHEAT", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
+  { symbol: "ZC=F", name: "Mais", ticker: "CORN", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
+  { symbol: "ZS=F", name: "Sojabohnen", ticker: "SOYBEAN", category: "Rohstoff", market: "NYMEX", sessions: ["eu", "us"] },
 
   // ── Krypto (12) – beide Runden, am Wochenende exklusiv ──
   { symbol: "BTC-USD", name: "Bitcoin", ticker: "BITCOIN", category: "Krypto", market: "Krypto", sessions: ["eu", "us"] },

@@ -254,7 +254,53 @@ function getSystemPrompt(dayType: TradingDayType): string {
   return SYSTEM_PROMPT_WEEKDAY;
 }
 
-function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string, exchangeNotes?: string[], newsContext?: string): string {
+async function fetchRecentPerformance(): Promise<string | null> {
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+
+    const since = new Date();
+    since.setDate(since.getDate() - 14);
+
+    const { data: trades } = await supabase
+      .from("trades")
+      .select("asset, direction, result, category")
+      .eq("status", "closed")
+      .gte("closed_at", since.toISOString())
+      .order("closed_at", { ascending: false });
+
+    if (!trades || trades.length < 3) return null;
+
+    const stats: Record<string, { wins: number; losses: number; total: number }> = {};
+    let directionStats = { long: 0, short: 0, longWin: 0, shortWin: 0 };
+
+    for (const t of trades) {
+      const cat = t.category || "Sonstige";
+      if (!stats[cat]) stats[cat] = { wins: 0, losses: 0, total: 0 };
+      stats[cat].total++;
+      const won = (t.result ?? 0) > 0;
+      if (won) stats[cat].wins++;
+      else stats[cat].losses++;
+
+      if (t.direction === "LONG") { directionStats.long++; if (won) directionStats.longWin++; }
+      if (t.direction === "SHORT") { directionStats.short++; if (won) directionStats.shortWin++; }
+    }
+
+    const lines: string[] = [`Letzte 14 Tage: ${trades.length} geschlossene Trades.`];
+    for (const [cat, s] of Object.entries(stats)) {
+      lines.push(`${cat}: ${s.wins}/${s.total} profitabel`);
+    }
+    if (directionStats.long > 0) lines.push(`LONG: ${directionStats.longWin}/${directionStats.long} profitabel`);
+    if (directionStats.short > 0) lines.push(`SHORT: ${directionStats.shortWin}/${directionStats.short} profitabel`);
+    lines.push("→ Bevorzuge Asset-Klassen und Richtungen mit höherer Trefferquote.");
+
+    return lines.join("\n");
+  } catch {
+    return null;
+  }
+}
+
+function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string, exchangeNotes?: string[], newsContext?: string, performanceFeedback?: string): string {
   const tradingHoursMap: Record<TradingDayType, string> = {
     weekend: `Handelszeiten (deutsche Zeit):
 - Krypto: 24/7 – einziger handelbarer Markt am Wochenende`,
@@ -317,10 +363,14 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`,
     ? `\nLIVE-NEWS (letzte 12h) — NEWS hat VETO-Recht! Wenn eine Nachricht klar GEGEN ein Asset spricht, setze NEWS-VETO und überspringe es:\n${newsContext}\n`
     : "";
 
+  const performanceBlock = performanceFeedback
+    ? `\nPERFORMANCE-FEEDBACK (letzte 14 Tage):\n${performanceFeedback}\n`
+    : "";
+
   return `Datum: ${date}
 
 ${tradingHours}
-${exchangeBlock}${contextBlock}${newsBlock}
+${exchangeBlock}${contextBlock}${newsBlock}${performanceBlock}
 Marktdaten:
 
 ${marketData}
@@ -544,11 +594,12 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
 
   console.log(`Modus: ${modeLabel}`);
 
-  // 1. Marktdaten + Kontext + News parallel laden
-  const [allMarketData, marketContext, newsContext] = await Promise.all([
+  // 1. Marktdaten + Kontext + News + Performance parallel laden
+  const [allMarketData, marketContext, newsContext, performanceFeedback] = await Promise.all([
     fetchMarketDataForDayType(dayType),
     fetchMarketContext(),
     fetchNewsContext(),
+    fetchRecentPerformance(),
   ]);
 
   if (newsContext) {
@@ -608,7 +659,7 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today, dayType, formattedContext, exchangeNotes, newsContext?.raw),
+        content: buildUserPrompt(formattedData, today, dayType, formattedContext, exchangeNotes, newsContext?.raw, performanceFeedback ?? undefined),
       },
     ],
   });

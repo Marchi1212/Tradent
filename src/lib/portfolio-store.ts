@@ -521,3 +521,34 @@ export async function addTrade(trade: {
 
   return toTrade(row);
 }
+
+// ── Risiko-Bremse ──────────────────────────
+// 3+ aufeinanderfolgende Verluste → halbe Positionsgröße
+
+export async function getRecentOutcomes(portfolioId: string, limit = 10): Promise<Array<{ result: number; closedAt: string }>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("trades")
+    .select("result, closed_at")
+    .eq("portfolio_id", portfolioId)
+    .eq("status", "closed")
+    .order("closed_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+  return data.map((row: { result: number | null; closed_at: string }) => ({
+    result: Number(row.result),
+    closedAt: row.closed_at as string,
+  }));
+}
+
+export async function isRiskBrakeActive(portfolioId: string): Promise<boolean> {
+  const outcomes = await getRecentOutcomes(portfolioId, 3);
+  if (outcomes.length < 3) return false;
+  return outcomes.every(o => o.result < 0);
+}
+
+export async function getRiskMultiplier(portfolioId: string): Promise<number> {
+  const active = await isRiskBrakeActive(portfolioId);
+  return active ? 0.5 : 1.0;
+}
