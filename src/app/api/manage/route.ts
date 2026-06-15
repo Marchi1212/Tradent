@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 export const maxDuration = 30;
 
-// Mid-Day Trade Management: Prüft offene Trades, queued Push wenn im Plus.
-// Cron-Aufruf um ~16:00 CET via cron-job.org.
+// Trade Management: Prüft offene Trades alle 30 Min, gibt klare Handlungsempfehlung.
+// Cron-Aufruf alle 30 Min via cron-job.org.
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -12,18 +12,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Nur zwischen 15:50 und 16:10 CET ausführen
+    // Nur zwischen 10:00 und 22:30 CET aktiv
     const cetNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
-    const cetHour = cetNow.getHours();
-    const cetMin = cetNow.getMinutes();
-    if (!(cetHour === 15 && cetMin >= 50) && !(cetHour === 16 && cetMin < 10)) {
-      return NextResponse.json({ skip: true, reason: "Außerhalb des Management-Fensters" });
+    const cetMinutes = cetNow.getHours() * 60 + cetNow.getMinutes();
+    if (cetMinutes < 600 || cetMinutes > 1350) {
+      return NextResponse.json({ skip: true, reason: "Außerhalb 10:00-22:30" });
     }
+
+    const isCloseTime = cetNow.getHours() >= 22;
 
     const { createAdminClient } = await import("@/lib/supabase/admin");
     const supabase = createAdminClient();
 
-    // 1. Alle offenen Trades laden (mit Signal-Info für Ticker)
     const { data: openTrades, error: tradesError } = await supabase
       .from("trades")
       .select("id, user_id, asset, direction, entry, stop_loss, take_profit, signal_id")
@@ -33,7 +33,6 @@ export async function GET(request: Request) {
       return NextResponse.json({ checked: 0 });
     }
 
-    // 2. Signal-Tickers laden
     const signalIds = [...new Set(openTrades.map(t => t.signal_id))];
     const { data: signals } = await supabase
       .from("signals")
@@ -45,7 +44,6 @@ export async function GET(request: Request) {
       tickerMap.set(s.id as string, s.ticker as string);
     }
 
-    // 3. Aktuelle Preise via Yahoo Finance holen
     const tickers = [...new Set(openTrades.map(t => tickerMap.get(t.signal_id)).filter(Boolean))] as string[];
     const priceMap = new Map<string, number>();
 
@@ -68,7 +66,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Für jeden Trade prüfen: im Plus ≥ 1x SL-Distanz?
     let notified = 0;
     for (const trade of openTrades) {
       const ticker = tickerMap.get(trade.signal_id);
@@ -81,27 +78,32 @@ export async function GET(request: Request) {
       const priceDiff = isLong
         ? currentPrice - trade.entry
         : trade.entry - currentPrice;
+      const profitPercent = ((priceDiff / trade.entry) * 100).toFixed(1);
+      const tpDistance = Math.abs(trade.take_profit - trade.entry);
+      const progressToTp = tpDistance > 0 ? priceDiff / tpDistance : 0;
 
-      // Mindestens 1x Risk im Plus?
-      if (priceDiff >= slDistance) {
-        const profitPercent = ((priceDiff / trade.entry) * 100).toFixed(1);
-        const tpDistance = Math.abs(trade.take_profit - trade.entry);
-        const progressToTp = tpDistance > 0 ? priceDiff / tpDistance : 0;
+      let title: string | null = null;
+      let body: string | null = null;
 
-        let title: string;
-        let body: string;
-        if (progressToTp >= 0.8) {
-          title = `${trade.asset}: Jetzt schließen (+${profitPercent}%)`;
-          body = "Fast am Take-Profit — Trade jetzt schließen und Gewinn mitnehmen.";
-        } else {
-          title = `${trade.asset}: SL auf Einstand setzen (+${profitPercent}%)`;
-          body = `Trade im Plus. SL auf ${trade.entry.toFixed(2)} setzen — dann ist der Trade risikofrei.`;
-        }
+      if (isCloseTime) {
+        // Ab 22:00: immer schließen, egal ob im Plus oder Minus
+        const prefix = priceDiff >= 0 ? `+${profitPercent}%` : `${profitPercent}%`;
+        title = `${trade.asset}: Jetzt schließen (${prefix})`;
+        body = "Feierabend — Trade jetzt schließen. Kein Overnight-Risiko.";
+      } else if (progressToTp >= 0.8) {
+        title = `${trade.asset}: Jetzt schließen (+${profitPercent}%)`;
+        body = "Fast am Take-Profit — Trade jetzt schließen und Gewinn mitnehmen.";
+      } else if (priceDiff >= slDistance) {
+        title = `${trade.asset}: SL auf Einstand setzen (+${profitPercent}%)`;
+        body = `Trade im Plus. SL auf ${trade.entry.toFixed(2)} setzen — dann ist der Trade risikofrei.`;
+      }
 
+      if (title && body) {
+        const signalKey = isCloseTime ? `close-${trade.id}` : `manage-${trade.id}`;
         await supabase.from("push_queue").upsert(
           {
             user_id: trade.user_id,
-            signal_id: `manage-${trade.id}`,
+            signal_id: signalKey,
             title,
             body,
             fire_at: new Date().toISOString(),
