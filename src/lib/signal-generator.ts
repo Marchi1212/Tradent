@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, fetchGlobalMarketData, fetchNonUSMarketData, fetchForexAndCryptoData, type AssetMarketData } from "./market-data";
 import { getTradingDayType, isCMEClosed, getExchangeNotes, type TradingDayType } from "./market-hours";
-import { fetchMarketContext, formatMarketContextForPrompt } from "./market-context";
+import { fetchMarketContext, formatMarketContextForPrompt, fetchNewsContext } from "./market-context";
 
 export interface GeneratedSignal {
   asset: string;
@@ -28,160 +28,221 @@ function formatMarketDataForPrompt(data: AssetMarketData[]): string {
       (d) =>
         `${d.name} (${d.ticker}) | ${d.category} | ${d.market}
   Kurs: ${d.currentPrice} | 1T: ${d.change1dPercent > 0 ? "+" : ""}${d.change1dPercent}% | 5T: ${d.change5dPercent > 0 ? "+" : ""}${d.change5dPercent}%
-  5T-Hoch: ${d.high5d} | 5T-Tief: ${d.low5d} | SMA20: ${d.sma20 ?? "n/a"} | RSI14: ${d.rsi14 ?? "n/a"}`
+  5T-Hoch: ${d.high5d} | 5T-Tief: ${d.low5d} | SMA20: ${d.sma20 ?? "n/a"} | RSI14: ${d.rsi14 ?? "n/a"}
+  ATR14: ${d.atr14 ?? "n/a"} (${d.atr14Percent != null ? d.atr14Percent + "%" : "n/a"} vom Kurs)`
     )
     .join("\n\n");
 }
 
-const SYSTEM_PROMPT_WEEKDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Du analysierst Marktdaten aus allen Assetklassen und identifizierst die 2 absolut besten Trading-Setups des Tages – unabhängig vom Markt.
+const SYSTEM_PROMPT_WEEKDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Du führst den folgenden Entscheidungsbaum STRIKT aus — keine freie Interpretation.
 
-ANALYSE-HIERARCHIE (Gewichtung):
-1. PRIMÄR – Technische Analyse (Kernentscheidung):
-   RSI14 + SMA20 + Price Action bestimmen Richtung. Momentum (1T/5T) bestätigt Trend. Support/Resistance (5T-Hoch/Tief) definieren Entry/SL/TP.
-2. SEKUNDÄR – Event-Filter (Veto-Funktion):
-   Earnings heute/morgen → Aktie NICHT traden oder Konfidenz -20-30%. FOMC/EZB/NFP/CPI heute → betroffene Märkte meiden oder Hebel halbieren.
-3. TERTIÄR – Sentiment (Feinjustierung ±5-10%):
-   Fear & Greed Extreme (<20 oder >80) verschieben Konfidenz als Kontraindikator.
+═══ ENTSCHEIDUNGSBAUM ═══
 
-Du gibst genau 2 Signale aus:
-1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
-2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
+SCHRITT 1 — FILTER (Assets eliminieren):
+Eliminiere jedes Asset das EINE dieser Bedingungen erfüllt:
+- RSI14 zwischen 45-55 (kein klares Signal, Seitwärtsmarkt)
+- ATR14% < 0.3% (zu wenig Tagesbewegung für Daytrading)
+- Earnings HEUTE oder MORGEN (zu unberechenbar)
+- NEWS-VETO aktiv (siehe News-Block)
+→ Nur Assets die ALLE Filter bestehen kommen in Frage.
 
-Regeln:
+SCHRITT 2 — RICHTUNG bestimmen:
+Für jedes verbleibende Asset:
+- RSI14 < 35 UND Kurs < SMA20 → LONG (überverkauft, Mean-Reversion)
+- RSI14 > 65 UND Kurs > SMA20 → SHORT (überkauft, Mean-Reversion)
+- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend-Fortsetzung)
+- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend-Fortsetzung)
+- Wenn keine Regel passt → Asset überspringen
+
+SCHRITT 3 — SL/TP via ATR (PFLICHT):
+- Stop-Loss = 1x ATR14 vom Entry entfernt (LONG: Entry - ATR14, SHORT: Entry + ATR14)
+- Take-Profit = 1.5x ATR14 vom Entry entfernt (LONG: Entry + 1.5×ATR14, SHORT: Entry - 1.5×ATR14)
+- Risk-Reward-Ratio ergibt sich automatisch: 1:1.5
+- Wenn ATR14 nicht verfügbar → Asset überspringen
+
+SCHRITT 4 — KONFIDENZ berechnen:
+Starte bei 60% Basis, dann addiere/subtrahiere:
++10% wenn RSI14 < 30 oder > 70 (starkes Signal)
++10% wenn Kurs-Trend (1T UND 5T) die Richtung bestätigt
++5%  wenn Kurs nahe 5T-Hoch (SHORT) oder 5T-Tief (LONG) = Support/Resistance
+-10% wenn Kurs gegen SMA20-Trend geht
+-20% wenn High-Impact Wirtschaftsevent heute
+-10% wenn Fear & Greed > 80 (bei LONG) oder < 20 (bei SHORT)
++5%  wenn Fear & Greed < 20 (bei LONG) oder > 80 (bei SHORT) = Kontraindikator
+→ Ergebnis auf 40-95% begrenzen.
+
+SCHRITT 5 — AUSWAHL:
+- Sortiere nach Konfidenz
+- STEADY = höchste Konfidenz, Hebel 2x-5x (Konfidenz muss ≥70%)
+- BOLD = zweithöchste Konfidenz, Hebel 5x-10x (Konfidenz muss ≥50%)
+- Beide Assets MÜSSEN unterschiedlich sein
+- LONG und SHORT sind BEIDE erwünscht — kein Bias!
+
+═══ REGELN ═══
 - Alle Trades sind CFD-Daytrading auf XTB
 - Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
-- Risk-Reward-Ratio mindestens 1:1.5
-- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Stop-Loss muss eng genug sein für Daytrading, aber NICHT enger als die Mindestabstände unten
-- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
-  Index: ≥0.8% | Aktie: ≥1.0% | Rohstoff: ≥1.5% | Forex: ≥0.3% | Krypto: ≥2.0%
-  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
-- Wähle die 2 BESTEN Assets – egal ob Index, Aktie, Forex, Rohstoff oder Krypto
-- Beide Assets MÜSSEN unterschiedlich sein
-- LONG und SHORT sind beide möglich
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität (z.B. "09:00–11:00" für EU-Indizes, "15:30–17:30" für US). MAXIMAL 2 Stunden breit!
+- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität. MAXIMAL 2 Stunden breit! Bevorzuge 14:00-17:00 CET (London-NY-Overlap = höchste Liquidität).
 - marketCloseTime = XTB-Handelsschluss (z.B. "22:00" für EU-Index-CFDs, "23:00" für US-Index-CFDs, "17:30" für EU-Aktien, "22:00" für US-Aktien)
-- Begründung auf Deutsch, 2-3 Sätze – erwähne Sentiment/Events wenn relevant
-- Entscheide nach Qualität des Setups UND berücksichtige Marktkontext
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_WEEKEND = `Du bist ein erfahrener Krypto-Daytrading-Analyst. Es ist Wochenende – traditionelle Märkte sind geschlossen. Du analysierst die Krypto-Marktdaten tiefgehend und identifizierst die 2 besten Crypto-Trading-Setups.
+const SYSTEM_PROMPT_WEEKEND = `Du bist ein regelbasierter Krypto-Daytrading-Analyst. Es ist Wochenende — nur Krypto handelbar. Führe den Entscheidungsbaum STRIKT aus.
 
-ANALYSE-HIERARCHIE (Gewichtung):
-1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
-2. SEKUNDÄR – Crypto Fear & Greed als Kontraindikator bei Extremen (±5-10% Konfidenz)
-3. Crypto-spezifisch: Volumen-Muster am Wochenende, Volatilitäts-Levels
+═══ ENTSCHEIDUNGSBAUM ═══
 
-Du gibst genau 2 Signale aus:
-1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
-2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
+SCHRITT 1 — FILTER:
+- RSI14 zwischen 45-55 → eliminieren
+- ATR14% < 0.3% → eliminieren
+- NEWS-VETO aktiv → eliminieren
 
-Regeln:
-- Alle Trades sind Krypto-CFDs auf XTB
-- Daytrading: Positionen werden innerhalb des Tages geöffnet und geschlossen
-- Risk-Reward-Ratio mindestens 1:1.5
-- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Beide Assets MÜSSEN unterschiedlich sein
-- LONG und SHORT sind beide möglich
-- Krypto-Volatilität am Wochenende beachten (oft niedriger, aber mit plötzlichen Spikes)
-- STOP-LOSS MINDESTABSTAND: Krypto ≥2.0% vom Entry. Zu enge SLs werden durch normales Rauschen ausgelöst.
-- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes 2-Stunden-Zeitfenster (z.B. "09:00–11:00", "14:00–16:00"). MAXIMAL 2 Stunden breit, nicht breiter!
-- marketCloseTime = "21:00" (Krypto 24/7, aber Trade soll abends geschlossen werden)
-- Begründung auf Deutsch, 2-3 Sätze
-- Performance first – analysiere jedes Asset sorgfältig
+SCHRITT 2 — RICHTUNG:
+- RSI14 < 35 UND Kurs < SMA20 → LONG
+- RSI14 > 65 UND Kurs > SMA20 → SHORT
+- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
+- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
 
-Antworte ausschließlich mit JSON, kein anderer Text.`;
+SCHRITT 3 — SL/TP via ATR:
+- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Kein ATR → Asset überspringen
 
-const SYSTEM_PROMPT_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist ein XETRA-Börsen-Feiertag – XETRA und europäische Börsen sind geschlossen. US-Märkte, Forex, Rohstoffe und Krypto sind aber handelbar. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
+SCHRITT 4 — KONFIDENZ (Basis 60%):
++10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
++5% Support/Resistance | -10% gegen SMA20
+-10% F&G Kontraindikator gegen Richtung | +5% F&G für Richtung
+→ Begrenzen auf 40-95%.
 
-ANALYSE-HIERARCHIE (Gewichtung):
-1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
-2. SEKUNDÄR – Event-Filter: Earnings/FOMC/NFP → Veto oder Konfidenz senken
-3. TERTIÄR – Sentiment: Fear & Greed Extreme als Kontraindikator (±5-10%)
+SCHRITT 5 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
+- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- Krypto-Wochenend-Volatilität beachten (oft niedriger, plötzliche Spikes)
 
-Du gibst genau 2 Signale aus:
-1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
-2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
-
-Regeln:
-- Alle Trades sind CFD-Daytrading auf XTB
-- Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
-- Risk-Reward-Ratio mindestens 1:1.5
-- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Wähle die 2 BESTEN Assets aus den VERFÜGBAREN Märkten (US, Forex, Rohstoffe, Krypto)
-- Beide Assets MÜSSEN unterschiedlich sein
-- LONG und SHORT sind beide möglich
-- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
-  Aktie: ≥1.0% | Rohstoff: ≥1.5% | Forex: ≥0.3% | Krypto: ≥2.0%
-  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
-- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität (z.B. "15:30–17:30"). MAXIMAL 2 Stunden breit!
-- marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
-- Begründung auf Deutsch, 2-3 Sätze
-- Performance first
+═══ REGELN ═══
+- Alle Trades sind Krypto-CFDs auf XTB, Daytrading
+- expectedGainPercent = Gewinn bei TP MIT Hebel
+- optimalEntry = 2h-Zeitfenster, MAXIMAL 2 Stunden breit
+- marketCloseTime = "21:00" (Trade abends schließen)
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute haben XETRA, NYSE UND CME geschlossen – Aktien, Indizes und Rohstoffe sind nicht handelbar. Nur Forex und Krypto sind verfügbar. Liquidität ist stark reduziert – konservativere Hebel bevorzugen.
+const SYSTEM_PROMPT_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Heute ist XETRA-Feiertag — EU-Börsen geschlossen. US, Forex, Rohstoffe, Krypto handelbar. Führe den Entscheidungsbaum STRIKT aus.
 
-ANALYSE-HIERARCHIE (Gewichtung):
-1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
-2. SEKUNDÄR – Feiertags-Kontext: Liquidität ist reduziert, Spreads können breiter sein. Konservativere Hebel bevorzugen.
-3. TERTIÄR – Sentiment: Fear & Greed Extreme als Kontraindikator (±5-10%)
+═══ ENTSCHEIDUNGSBAUM ═══
 
-Du gibst genau 2 Signale aus:
-1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
-2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
+SCHRITT 1 — FILTER:
+- RSI14 zwischen 45-55 → eliminieren
+- ATR14% < 0.3% → eliminieren
+- Earnings HEUTE/MORGEN → eliminieren
+- NEWS-VETO aktiv → eliminieren
 
-Regeln:
-- Alle Trades sind CFD-Daytrading auf XTB
-- Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
-- Risk-Reward-Ratio mindestens 1:1.5
-- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Wähle die 2 BESTEN Assets aus Forex ODER Krypto – KEINE Rohstoffe (CME geschlossen)
-- Beide Assets MÜSSEN unterschiedlich sein
-- LONG und SHORT sind beide möglich
-- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
-  Forex: ≥0.3% | Krypto: ≥2.0%
-  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
-- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes 2-Stunden-Zeitfenster. MAXIMAL 2 Stunden breit!
-- marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
-- Begründung auf Deutsch, 2-3 Sätze
-- Performance first
+SCHRITT 2 — RICHTUNG:
+- RSI14 < 35 UND Kurs < SMA20 → LONG
+- RSI14 > 65 UND Kurs > SMA20 → SHORT
+- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
+- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+
+SCHRITT 3 — SL/TP via ATR:
+- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Kein ATR → Asset überspringen
+
+SCHRITT 4 — KONFIDENZ (Basis 60%):
++10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
++5% Support/Resistance | -10% gegen SMA20
+-20% High-Impact Event heute | -10% F&G Kontraindikator | +5% F&G für Richtung
+→ Begrenzen auf 40-95%.
+
+SCHRITT 5 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
+- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- Nur VERFÜGBARE Märkte (kein XETRA)
+
+═══ REGELN ═══
+- CFD-Daytrading auf XTB, innerhalb des Tages schließen
+- expectedGainPercent = Gewinn bei TP MIT Hebel
+- optimalEntry = 2h-Zeitfenster, bevorzuge 14:00-17:00 CET
+- marketCloseTime = XTB-Handelsschluss
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_US_HOLIDAY = `Du bist ein erfahrener CFD-Daytrading-Analyst. Heute ist ein US-Feiertag – NYSE und NASDAQ sind geschlossen. Europäische Börsen, Forex, Rohstoffe und Krypto sind handelbar. Du analysierst die verfügbaren Marktdaten und identifizierst die 2 besten Trading-Setups.
+const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Doppel-Feiertag — XETRA+NYSE+CME geschlossen. NUR Forex und Krypto. Liquidität reduziert — konservativere Hebel. Führe den Entscheidungsbaum STRIKT aus.
 
-ANALYSE-HIERARCHIE (Gewichtung):
-1. PRIMÄR – Technische Analyse: RSI14, SMA20, Price Action, Momentum
-2. SEKUNDÄR – Event-Filter: Earnings/EZB → Veto oder Konfidenz senken
-3. TERTIÄR – Sentiment: Fear & Greed Extreme als Kontraindikator (±5-10%)
+═══ ENTSCHEIDUNGSBAUM ═══
 
-Du gibst genau 2 Signale aus:
-1. STEADY: Hohe Konfidenz (≥75%), moderater Hebel (2x–5x), konservatives Setup
-2. BOLD: Kann risikoreicher sein (Konfidenz ≥55%), höherer Hebel (5x–10x), aggressiveres Setup mit mehr Potenzial
+SCHRITT 1 — FILTER:
+- RSI14 zwischen 45-55 → eliminieren
+- ATR14% < 0.3% → eliminieren
+- NEWS-VETO aktiv → eliminieren
 
-Regeln:
-- Alle Trades sind CFD-Daytrading auf XTB
-- Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
-- Risk-Reward-Ratio mindestens 1:1.5
-- Entry, Stop-Loss und Take-Profit müssen präzise, realistische Kursniveaus sein
-- Wähle die 2 BESTEN Assets aus den VERFÜGBAREN Märkten (kein US)
-- Beide Assets MÜSSEN unterschiedlich sein
-- LONG und SHORT sind beide möglich
-- STOP-LOSS MINDESTABSTÄNDE (Abstand Entry→SL in % vom Entry):
-  Index: ≥0.8% | Aktie: ≥1.0% | Rohstoff: ≥1.5% | Forex: ≥0.3% | Krypto: ≥2.0%
-  Grund: Zu enge SLs werden durch normales Tagesrauschen ausgelöst. Passe R:R und TP entsprechend an.
-- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität. MAXIMAL 2 Stunden breit!
-- marketCloseTime = XTB-Handelsschluss für das jeweilige Instrument
-- Begründung auf Deutsch, 2-3 Sätze
-- Performance first
+SCHRITT 2 — RICHTUNG:
+- RSI14 < 35 UND Kurs < SMA20 → LONG
+- RSI14 > 65 UND Kurs > SMA20 → SHORT
+- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
+- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+
+SCHRITT 3 — SL/TP via ATR:
+- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Kein ATR → Asset überspringen
+
+SCHRITT 4 — KONFIDENZ (Basis 60%, dann -5% wegen reduzierter Liquidität):
++10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
++5% Support/Resistance | -10% gegen SMA20
+-10% F&G Kontraindikator | +5% F&G für Richtung
+→ Begrenzen auf 40-95%.
+
+SCHRITT 5 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-3x Hebel (≥70%, konservativer wegen Feiertag)
+- BOLD = zweithöchste, 3x-7x Hebel (≥50%)
+- NUR Forex und Krypto — KEINE Rohstoffe
+
+═══ REGELN ═══
+- CFD-Daytrading auf XTB, innerhalb des Tages schließen
+- expectedGainPercent = Gewinn bei TP MIT Hebel
+- optimalEntry = 2h-Zeitfenster
+- marketCloseTime = XTB-Handelsschluss
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
+
+Antworte ausschließlich mit JSON, kein anderer Text.`;
+
+const SYSTEM_PROMPT_US_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. US-Feiertag — NYSE/NASDAQ geschlossen. EU, Forex, Rohstoffe, Krypto handelbar. Führe den Entscheidungsbaum STRIKT aus.
+
+═══ ENTSCHEIDUNGSBAUM ═══
+
+SCHRITT 1 — FILTER:
+- RSI14 zwischen 45-55 → eliminieren
+- ATR14% < 0.3% → eliminieren
+- Earnings HEUTE/MORGEN → eliminieren
+- NEWS-VETO aktiv → eliminieren
+
+SCHRITT 2 — RICHTUNG:
+- RSI14 < 35 UND Kurs < SMA20 → LONG
+- RSI14 > 65 UND Kurs > SMA20 → SHORT
+- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
+- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+
+SCHRITT 3 — SL/TP via ATR:
+- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Kein ATR → Asset überspringen
+
+SCHRITT 4 — KONFIDENZ (Basis 60%):
++10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
++5% Support/Resistance | -10% gegen SMA20
+-20% High-Impact Event heute | -10% F&G Kontraindikator | +5% F&G für Richtung
+→ Begrenzen auf 40-95%.
+
+SCHRITT 5 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
+- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- Nur VERFÜGBARE Märkte (kein US)
+
+═══ REGELN ═══
+- CFD-Daytrading auf XTB, innerhalb des Tages schließen
+- expectedGainPercent = Gewinn bei TP MIT Hebel
+- optimalEntry = 2h-Zeitfenster, bevorzuge 09:00-11:00 CET für EU, 14:00-16:00 für Forex/Rohstoffe
+- marketCloseTime = XTB-Handelsschluss
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -193,7 +254,7 @@ function getSystemPrompt(dayType: TradingDayType): string {
   return SYSTEM_PROMPT_WEEKDAY;
 }
 
-function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string, exchangeNotes?: string[]): string {
+function buildUserPrompt(marketData: string, date: string, dayType: TradingDayType, marketContext?: string, exchangeNotes?: string[], newsContext?: string): string {
   const tradingHoursMap: Record<TradingDayType, string> = {
     weekend: `Handelszeiten (deutsche Zeit):
 - Krypto: 24/7 – einziger handelbarer Markt am Wochenende`,
@@ -252,10 +313,14 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`,
     ? `\nBÖRSEN-HINWEISE:\n${exchangeNotes.join("\n")}\n`
     : "";
 
+  const newsBlock = newsContext
+    ? `\nLIVE-NEWS (letzte 12h) — NEWS hat VETO-Recht! Wenn eine Nachricht klar GEGEN ein Asset spricht, setze NEWS-VETO und überspringe es:\n${newsContext}\n`
+    : "";
+
   return `Datum: ${date}
 
 ${tradingHours}
-${exchangeBlock}${contextBlock}
+${exchangeBlock}${contextBlock}${newsBlock}
 Marktdaten:
 
 ${marketData}
@@ -352,11 +417,16 @@ export async function generateSignals(): Promise<{
 
   console.log(`Modus: ${modeLabel}`);
 
-  // 1. Marktdaten + Kontext parallel laden
-  const [marketData, marketContext] = await Promise.all([
+  // 1. Marktdaten + Kontext + News parallel laden
+  const [marketData, marketContext, newsContext] = await Promise.all([
     fetchMarketDataForDayType(dayType),
     fetchMarketContext(),
+    fetchNewsContext(),
   ]);
+
+  if (newsContext) {
+    console.log(`Live-News geladen: ${newsContext.headlines.length} Meldungen`);
+  }
 
   // Kontext loggen
   if (marketContext.fearGreed) {
@@ -403,7 +473,7 @@ export async function generateSignals(): Promise<{
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today, dayType, formattedContext, exchangeNotes),
+        content: buildUserPrompt(formattedData, today, dayType, formattedContext, exchangeNotes, newsContext?.raw),
       },
     ],
   });
@@ -432,49 +502,20 @@ export async function generateSignals(): Promise<{
   parsed.steady.riskClass = "steady";
   parsed.bold.riskClass = "bold";
 
-  // SL-Mindestabstände erzwingen (Sicherheitsnetz falls Prompt ignoriert wird)
-  enforceMinSlDistance(parsed.steady);
-  enforceMinSlDistance(parsed.bold);
+  // SL-Mindestabstände erzwingen (ATR-basiert, Fallback auf feste %)
+  enforceMinSlDistance(parsed.steady, marketData);
+  enforceMinSlDistance(parsed.bold, marketData);
 
   console.log(
     `Signale generiert: ${parsed.steady.asset} (Steady, ${parsed.steady.market}) + ${parsed.bold.asset} (Bold, ${parsed.bold.market})`
   );
 
-  // 5. Perplexity Gegencheck (optional – nur wenn API Key vorhanden)
-  if (process.env.PERPLEXITY_API_KEY) {
-    console.log("Perplexity Gegencheck wird durchgeführt...");
-    const [steadyCheck, boldCheck] = await Promise.all([
-      perplexityCheck(parsed.steady),
-      perplexityCheck(parsed.bold),
-    ]);
-
-    if (steadyCheck) {
-      if (!steadyCheck.approved) {
-        console.log(`Perplexity WARNUNG (Steady): ${steadyCheck.reason}`);
-        parsed.steady.confidence = Math.max(40, parsed.steady.confidence - steadyCheck.confidenceReduction);
-        parsed.steady.reasoning += ` ⚠️ ${steadyCheck.reason}`;
-      } else {
-        console.log(`Perplexity OK (Steady): ${steadyCheck.reason}`);
-      }
-    }
-
-    if (boldCheck) {
-      if (!boldCheck.approved) {
-        console.log(`Perplexity WARNUNG (Bold): ${boldCheck.reason}`);
-        parsed.bold.confidence = Math.max(40, parsed.bold.confidence - boldCheck.confidenceReduction);
-        parsed.bold.reasoning += ` ⚠️ ${boldCheck.reason}`;
-      } else {
-        console.log(`Perplexity OK (Bold): ${boldCheck.reason}`);
-      }
-    }
-  }
-
   return parsed;
 }
 
-// ── SL-Mindestabstand erzwingen ──────────────────
+// ── SL-Mindestabstand erzwingen (ATR-basiert mit Fallback) ──────────────────
 
-const MIN_SL_PERCENT: Record<string, number> = {
+const FALLBACK_MIN_SL_PERCENT: Record<string, number> = {
   Index: 0.8,
   Aktie: 1.0,
   Rohstoff: 1.5,
@@ -482,114 +523,39 @@ const MIN_SL_PERCENT: Record<string, number> = {
   Krypto: 2.0,
 };
 
-function enforceMinSlDistance(signal: GeneratedSignal): void {
-  const minPct = MIN_SL_PERCENT[signal.category];
-  if (!minPct) return;
+function enforceMinSlDistance(signal: GeneratedSignal, marketData: AssetMarketData[]): void {
+  const assetData = marketData.find(d => d.ticker === signal.ticker || d.name === signal.asset);
+  const atr = assetData?.atr14;
 
-  const slDist = Math.abs(signal.entry - signal.stopLoss) / signal.entry * 100;
-  if (slDist >= minPct) return;
-
-  // SL erweitern auf Mindestabstand
-  const adjustment = signal.entry * (minPct / 100);
-  const oldSl = signal.stopLoss;
-
-  if (signal.direction === "LONG") {
-    signal.stopLoss = Math.round((signal.entry - adjustment) * 10000) / 10000;
+  // ATR-basiert: SL muss mindestens 1x ATR vom Entry entfernt sein
+  let minDistance: number;
+  if (atr && atr > 0) {
+    minDistance = atr;
   } else {
-    signal.stopLoss = Math.round((signal.entry + adjustment) * 10000) / 10000;
+    const fallbackPct = FALLBACK_MIN_SL_PERCENT[signal.category] ?? 1.0;
+    minDistance = signal.entry * (fallbackPct / 100);
   }
 
+  const currentDist = Math.abs(signal.entry - signal.stopLoss);
+  if (currentDist >= minDistance) return;
+
+  const oldSl = signal.stopLoss;
+  if (signal.direction === "LONG") {
+    signal.stopLoss = Math.round((signal.entry - minDistance) * 10000) / 10000;
+  } else {
+    signal.stopLoss = Math.round((signal.entry + minDistance) * 10000) / 10000;
+  }
+
+  // TP auf 1.5x ATR setzen wenn SL korrigiert wurde
+  const tpDistance = minDistance * 1.5;
+  if (signal.direction === "LONG") {
+    signal.takeProfit = Math.round((signal.entry + tpDistance) * 10000) / 10000;
+  } else {
+    signal.takeProfit = Math.round((signal.entry - tpDistance) * 10000) / 10000;
+  }
+
+  const source = atr ? "ATR" : "Fallback";
   console.log(
-    `SL-Korrektur (${signal.asset}): ${oldSl} → ${signal.stopLoss} (${slDist.toFixed(2)}% → ${minPct}% Mindestabstand)`
+    `SL/TP-Korrektur [${source}] (${signal.asset}): SL ${oldSl} → ${signal.stopLoss}, TP → ${signal.takeProfit}`
   );
-}
-
-// ── Perplexity News-Gegencheck ──────────────────
-
-interface PerplexityResult {
-  approved: boolean;
-  confidenceReduction: number;
-  reason: string;
-}
-
-async function perplexityCheck(signal: GeneratedSignal): Promise<PerplexityResult | null> {
-  try {
-    const res = await fetch("https://api.perplexity.ai/v1/sonar", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "sonar",
-        messages: [
-          {
-            role: "system",
-            content: `Du bist ein Finanz-News-Filter. Deine EINZIGE Aufgabe: Prüfe ob es in den letzten 24 Stunden eine KONKRETE, UNERWARTETE Nachricht gibt, die GEGEN die geplante Trade-Richtung spricht.
-
-WICHTIG — Richtung beachten:
-- Bei einem LONG-Trade: Nur NEGATIVE Überraschungsnachrichten sind ein Risiko
-- Bei einem SHORT-Trade: Nur POSITIVE Überraschungsnachrichten sind ein Risiko
-- Nachrichten die die Trade-Richtung BESTÄTIGEN sind KEIN Risiko (→ approved=true)
-
-WARNUNG NUR bei konkreten, heutigen Events die GEGEN die Richtung sprechen:
-- Überraschende Gewinnwarnung/Bilanzskandal bei einem LONG-Trade
-- Überraschend positive Zahlen/Deals bei einem SHORT-Trade
-- Plötzliche Regulierung die den Kurs GEGEN unsere Richtung treibt
-- Unerwarteter Flash-Crash (bei LONG) oder Short-Squeeze (bei SHORT)
-- Überraschende Zentralbank-Entscheidung GEGEN unsere Richtung
-
-KEIN Grund für eine Warnung (MUSS approved=true sein):
-- Allgemeine Marktvolatilität oder -unsicherheit
-- Laufende geopolitische Spannungen (Kriege, Handelskonflikte)
-- Bekannte Inflationsdaten oder Zinserwartungen
-- Allgemeines Sentiment (Fear & Greed, Risk-off-Stimmung)
-- Technische Schwäche oder Momentum-Verlust (bereits in der Analyse)
-- Liquidationsrisiken bei Krypto (sind normal)
-- Nachrichten die unsere Trade-Richtung UNTERSTÜTZEN
-
-Im Zweifel: approved=true. Der technische Analyst hat allgemeine Faktoren bereits berücksichtigt. Du suchst NUR nach Überraschungen die GEGEN unsere Position sprechen und noch NICHT im Kurs eingepreist sind.
-
-Antworte NUR mit JSON:
-{
-  "approved": true/false,
-  "confidenceReduction": 0-30,
-  "reason": "Kurze Begründung auf Deutsch (max 1 Satz)"
-}`,
-          },
-          {
-            role: "user",
-            content: `Gibt es in den letzten 24h eine KONKRETE, ÜBERRASCHENDE Nachricht die GEGEN diesen Trade spricht?
-
-Asset: ${signal.asset} (${signal.ticker})
-Richtung: ${signal.direction} (d.h. wir setzen auf ${signal.direction === "LONG" ? "steigende" : "fallende"} Kurse)
-Kategorie: ${signal.category}
-
-Nachrichten die ${signal.direction === "LONG" ? "steigende" : "fallende"} Kurse BESTÄTIGEN sind KEIN Risiko.
-Antworte mit approved=true wenn du nichts findest das GEGEN unsere Richtung spricht.`,
-          },
-        ],
-        max_tokens: 300,
-        temperature: 0.1,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) {
-      console.error(`Perplexity API Fehler: ${res.status}`);
-      return null;
-    }
-
-    const json = await res.json();
-    const content = json.choices?.[0]?.message?.content;
-    if (!content) return null;
-
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    return JSON.parse(jsonMatch[0]) as PerplexityResult;
-  } catch (err) {
-    console.error("Perplexity Check fehlgeschlagen:", err);
-    return null; // Bei Fehler einfach weitermachen ohne Check
-  }
 }

@@ -205,6 +205,68 @@ export async function fetchEconomicCalendar(): Promise<EconomicEvent[]> {
   }
 }
 
+// ── Live-News via Perplexity (Pre-Input) ────────
+
+export interface NewsContext {
+  headlines: string[];
+  raw: string;
+}
+
+export async function fetchNewsContext(): Promise<NewsContext | null> {
+  if (!process.env.PERPLEXITY_API_KEY) return null;
+
+  try {
+    const res = await fetch("https://api.perplexity.ai/v1/sonar", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [
+          {
+            role: "system",
+            content: `Du bist ein Finanz-News-Analyst. Liefere die 3-5 wichtigsten Finanznachrichten der letzten 12 Stunden, die Aktienkurse, Indizes, Rohstoffe, Forex oder Krypto bewegen könnten.
+
+Pro Nachricht:
+- Was ist passiert (1 Satz)
+- Welche Assets sind betroffen
+- Erwartete Kursrichtung (bullish/bearish)
+
+Fokus auf: Zentralbank-Entscheidungen, Geopolitik (Kriege, Sanktionen, Handelsabkommen), überraschende Wirtschaftsdaten, große Earnings-Überraschungen, Rohstoff-Angebots-Schocks.
+
+Antworte auf Deutsch, kompakt. Keine Einleitung, direkt die Nachrichten.`,
+          },
+          {
+            role: "user",
+            content: `Was sind die 3-5 wichtigsten Finanznachrichten der letzten 12 Stunden? Heute ist ${new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}.`,
+          },
+        ],
+        max_tokens: 500,
+        temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      console.error(`Perplexity News API Fehler: ${res.status}`);
+      return null;
+    }
+
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) return null;
+
+    const headlines = content.split("\n").filter((line: string) => line.trim().length > 0);
+
+    return { headlines, raw: content };
+  } catch (err) {
+    console.error("Perplexity News fehlgeschlagen:", err);
+    return null;
+  }
+}
+
 // ── Alles zusammen laden ────────────────────────
 
 export interface MarketContext {

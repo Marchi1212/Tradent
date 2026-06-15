@@ -93,6 +93,8 @@ export interface AssetMarketData {
   low5d: number;
   sma20: number | null;
   rsi14: number | null;
+  atr14: number | null;
+  atr14Percent: number | null;
 }
 
 // RSI berechnen (14 Perioden)
@@ -114,6 +116,23 @@ function calculateRSI(closes: number[], period = 14): number | null {
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
   return Math.round((100 - 100 / (1 + rs)) * 10) / 10;
+}
+
+// Average True Range (14 Perioden)
+function calculateATR(highs: number[], lows: number[], closes: number[], period = 14): number | null {
+  if (highs.length < period + 1 || lows.length < period + 1 || closes.length < period + 1) return null;
+
+  const trueRanges: number[] = [];
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const high = highs[i];
+    const low = lows[i];
+    const prevClose = closes[i - 1];
+    const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+    trueRanges.push(tr);
+  }
+
+  const atr = trueRanges.reduce((sum, tr) => sum + tr, 0) / period;
+  return Math.round(atr * 10000) / 10000;
 }
 
 // Simple Moving Average
@@ -158,6 +177,9 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
     const last5Highs = highs.slice(-5);
     const last5Lows = lows.slice(-5);
 
+    const atr14 = calculateATR(highs, lows, closes);
+    const atr14Percent = atr14 && currentPrice ? Math.round((atr14 / currentPrice) * 10000) / 100 : null;
+
     return {
       name: asset.name,
       ticker: asset.ticker,
@@ -170,6 +192,8 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
       low5d: Math.round(Math.min(...last5Lows) * 100) / 100,
       sma20: calculateSMA(closes, 20),
       rsi14: calculateRSI(closes),
+      atr14,
+      atr14Percent,
     };
   } catch (err) {
     console.error(`Marktdaten für ${asset.symbol} fehlgeschlagen:`, err);
