@@ -318,15 +318,16 @@ export default function Dashboard() {
           next: { label: `Signale um ${signalsWaitUntil}`, color: "grey" },
         };
       }
-      if (mins < 9 * 60 + 15) {
+      if (mins >= 9 * 60 + 15) {
         return {
-          now: { label: "Marktanalyse", color: "grey" },
-          next: { label: "Scan um 09:15", color: "grey" },
+          now: { label: "Märkte laufen an", color: "grey" },
+          next: { label: `Signale um ${signalsWaitUntil}`, color: "grey" },
         };
       }
+      const nextLabel = isWE ? "Montag ab 09:15" : day === 6 ? "Montag ab 09:15" : "Scan um 09:15";
       return {
-        now: { label: "Märkte laufen an", color: "grey" },
-        next: { label: `Signale um ${signalsWaitUntil}`, color: "grey" },
+        now: { label: "Wartet auf Börsenstart", color: "grey" },
+        next: { label: nextLabel, color: "grey" },
       };
     }
 
