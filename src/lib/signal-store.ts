@@ -42,7 +42,8 @@ export async function getTodaySignals(): Promise<{
     .from("signals")
     .select("*")
     .eq("date", today)
-    .eq("session", "daily");
+    .eq("session", "daily")
+    .gt("entry", 0);
 
   if (error) throw error;
   if (!data || data.length < 2) return null;
@@ -64,7 +65,8 @@ export async function todaySignalsExist(): Promise<boolean> {
     .from("signals")
     .select("*", { count: "exact", head: true })
     .eq("date", today)
-    .eq("session", "daily");
+    .eq("session", "daily")
+    .gt("entry", 0);
 
   if (error) return false;
   return (count ?? 0) >= 2;
@@ -143,7 +145,7 @@ export async function saveScanCandidates(candidates: ScanCandidate[]): Promise<v
 
   const rows = candidates.map((c, i) => ({
     date: today,
-    session: "scan",
+    session: "daily",
     risk_class: i % 2 === 0 ? "steady" : "bold",
     asset: c.asset,
     ticker: c.ticker,
@@ -174,7 +176,8 @@ export async function getScanCandidates(): Promise<ScanCandidate[] | null> {
     .from("signals")
     .select("*")
     .eq("date", today)
-    .eq("session", "scan")
+    .eq("session", "daily")
+    .eq("entry", 0)
     .order("confidence", { ascending: false });
 
   if (error) throw error;
@@ -199,7 +202,8 @@ export async function scanCandidatesExist(): Promise<boolean> {
     .from("signals")
     .select("*", { count: "exact", head: true })
     .eq("date", today)
-    .eq("session", "scan");
+    .eq("session", "daily")
+    .eq("entry", 0);
 
   if (error) return false;
   return (count ?? 0) >= 2;
