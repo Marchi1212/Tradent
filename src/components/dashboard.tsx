@@ -254,7 +254,7 @@ export default function Dashboard() {
 
   const totalPnl = portfolio ? (portfolio.currentBalance + investedAmount - portfolio.budget) : 0;
 
-  interface StatusBlock { label: string; time?: string }
+  interface StatusBlock { label: string; time?: string; action?: boolean }
   function getStatusBar(): { now: StatusBlock; next: StatusBlock } | null {
     if (!loaded || !portfolio) return null;
     if (activeTab !== "signals") return null;
@@ -271,8 +271,8 @@ export default function Dashboard() {
     if (openTradeCount > 0) {
       if (mins >= 22 * 60) {
         return {
-          now: { label: "Trade offen" },
-          next: { label: "Position schließen", time: "Jetzt" },
+          now: { label: "Trade offen", action: true },
+          next: { label: "Position schließen", time: "Jetzt", action: true },
         };
       }
       const nextCheck30 = Math.ceil((mins + 1) / 30) * 30;
@@ -282,7 +282,7 @@ export default function Dashboard() {
       if (mins >= 21 * 60 + 30) {
         return {
           now: { label: "Trade aktiv" },
-          next: { label: "Position schließen", time: "22:00" },
+          next: { label: "Position schließen", time: "22:00", action: true },
         };
       }
       return {
@@ -297,8 +297,8 @@ export default function Dashboard() {
         (signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id));
       if (hasVisibleSignal) {
         return {
-          now: { label: "Empfehlungen bereit" },
-          next: { label: "Trade eröffnen" },
+          now: { label: "Empfehlungen bereit", action: true },
+          next: { label: "Trade eröffnen", action: true },
         };
       }
       return {
@@ -469,22 +469,22 @@ export default function Dashboard() {
       {/* Status Bar */}
       {statusBar && (
         <div className="px-5 w-full max-w-lg mx-auto pt-2">
-          <div className="rounded-[12px] border border-border overflow-hidden flex items-stretch bg-bg-secondary">
-            {/* AKTUELL — dunkel mit Pfeilspitze rechts */}
+          <div className={`rounded-[12px] border overflow-hidden flex items-stretch ${statusBar.now.action ? "border-[#2563EB]/30 bg-[#EFF6FF]" : "border-border bg-bg-secondary"}`}>
+            {/* AKTUELL */}
             <div
-              className="flex-1 bg-text-primary pl-4 pr-6 py-3"
+              className={`flex-1 pr-6 py-3 text-center ${statusBar.now.action ? "bg-[#2563EB]" : "bg-text-primary"}`}
               style={{ clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)" }}
             >
               <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-0.5">Aktuell</p>
               <p className="text-sm font-bold text-white truncate">{statusBar.now.label}</p>
             </div>
-            {/* NÄCHSTER SCHRITT — hell */}
-            <div className="flex-1 pl-2 pr-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted/50 mb-0.5">Nächster Schritt</p>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-text-primary truncate">{statusBar.next.label}</p>
+            {/* NÄCHSTER SCHRITT */}
+            <div className="flex-1 py-3 text-center">
+              <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${statusBar.next.action ? "text-[#2563EB]/40" : "text-text-muted/50"}`}>Nächster Schritt</p>
+              <div className="flex items-center justify-center gap-2">
+                <p className={`text-sm font-bold truncate ${statusBar.next.action ? "text-[#2563EB]" : "text-text-primary"}`}>{statusBar.next.label}</p>
                 {statusBar.next.time && (
-                  <span className="shrink-0 text-[11px] font-bold text-text-primary bg-bg-elevated px-2 py-0.5 rounded-full border border-border">
+                  <span className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusBar.next.action ? "text-[#2563EB] bg-[#DBEAFE] border-[#2563EB]/20" : "text-text-primary bg-bg-elevated border-border"}`}>
                     {statusBar.next.time}
                   </span>
                 )}
