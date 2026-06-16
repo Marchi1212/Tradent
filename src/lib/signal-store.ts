@@ -2,10 +2,6 @@ import type { Signal } from "./mock-signals";
 import type { ScanCandidate } from "./signal-generator";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-async function getServerClient() {
-  const { createClient } = await import("@/lib/supabase/server");
-  return createClient();
-}
 
 function toSignal(row: Record<string, unknown>): Signal {
   return {
@@ -30,12 +26,12 @@ function toSignal(row: Record<string, unknown>): Signal {
   };
 }
 
-// Heutige Signale laden (server-seitig)
+// Heutige Signale laden (admin-client für API-Routen, umgeht RLS)
 export async function getTodaySignals(): Promise<{
   steady: Signal;
   bold: Signal;
 } | null> {
-  const supabase = await getServerClient();
+  const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
   const { data, error } = await supabase
@@ -57,7 +53,7 @@ export async function getTodaySignals(): Promise<{
 
 // Prüfen ob heute schon Signale existieren
 export async function todaySignalsExist(): Promise<boolean> {
-  const supabase = await getServerClient();
+  const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
   const { count, error } = await supabase
