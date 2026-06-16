@@ -123,7 +123,8 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    Promise.all([loadPortfolio(), loadSignals()]).then(() => setLoaded(true));
+    loadPortfolio().then(() => setLoaded(true));
+    loadSignals();
     // Service Worker + Notifications initialisieren
     initNotifications().then(() => {
       const state = permissionState();
