@@ -1,25 +1,28 @@
 import { NextResponse } from "next/server";
 import { getScanCandidates } from "@/lib/signal-store";
-import { generatePreAnalysis } from "@/lib/signal-generator";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-export const maxDuration = 60;
+export const maxDuration = 10;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get("action") || "old";
+
   try {
-    const oldCandidates = await getScanCandidates();
+    if (action === "old") {
+      const oldCandidates = await getScanCandidates();
+      return NextResponse.json({ candidates: oldCandidates });
+    }
 
-    console.log("Compare: Generiere frische Analyse mit neuen Indikatoren...");
-    const newCandidates = await generatePreAnalysis();
+    if (action === "clear") {
+      const supabase = createAdminClient();
+      await supabase.storage.from("cache").remove(["scan-candidates.json"]);
+      return NextResponse.json({ cleared: true, info: "Now call /api/signals/scan to regenerate with new indicators" });
+    }
 
-    return NextResponse.json({
-      old: oldCandidates,
-      new: newCandidates,
-      oldCount: oldCandidates?.length ?? 0,
-      newCount: newCandidates.length,
-    });
+    return NextResponse.json({ error: "Use ?action=old or ?action=clear" }, { status: 400 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : JSON.stringify(err);
-    console.error("Compare fehlgeschlagen:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
