@@ -601,7 +601,7 @@ export default function Dashboard() {
             ) : signals ? (
               <div className="space-y-4">
                 {signals.steady.confidence >= 70 || openTradeSignals.has(signals.steady.id) ? (
-                  <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={() => { loadPortfolio(); checkOpenTrades(); }} />
+                  <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={() => { setOpenTradeCount(c => c + 1); setOpenTradeSignals(s => new Set([...s, signals!.steady.id])); loadPortfolio().then(checkOpenTrades); }} />
                 ) : (
                   <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
                     <p className="text-sm font-semibold text-text-primary">Kein Steady-Signal heute</p>
@@ -609,7 +609,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 {signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id) ? (
-                  <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={() => { loadPortfolio(); checkOpenTrades(); }} />
+                  <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={() => { setOpenTradeCount(c => c + 1); setOpenTradeSignals(s => new Set([...s, signals!.bold.id])); loadPortfolio().then(checkOpenTrades); }} />
                 ) : (
                   <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
                     <p className="text-sm font-semibold text-text-primary">Kein Bold-Signal heute</p>
