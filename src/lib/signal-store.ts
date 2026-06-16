@@ -1,5 +1,6 @@
 import type { Signal } from "./mock-signals";
 import type { ScanCandidate } from "./signal-generator";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 async function getServerClient() {
   const { createClient } = await import("@/lib/supabase/server");
@@ -106,7 +107,7 @@ export async function saveTodaySignals(signals: {
     category: string;
   };
 }): Promise<void> {
-  const supabase = await getServerClient();
+  const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
   const rows = [signals.steady, signals.bold].map((s, i) => ({
@@ -137,7 +138,7 @@ export async function saveTodaySignals(signals: {
 // ── Scan-Kandidaten (Pre-Analysis) ──────────────────
 
 export async function saveScanCandidates(candidates: ScanCandidate[]): Promise<void> {
-  const supabase = await getServerClient();
+  const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
   const rows = candidates.map((c, i) => ({
@@ -191,7 +192,7 @@ export async function getScanCandidates(): Promise<ScanCandidate[] | null> {
 }
 
 export async function scanCandidatesExist(): Promise<boolean> {
-  const supabase = await getServerClient();
+  const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
   const { count, error } = await supabase

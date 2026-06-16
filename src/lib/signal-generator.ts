@@ -256,8 +256,8 @@ function getSystemPrompt(dayType: TradingDayType): string {
 
 async function fetchRecentPerformance(): Promise<string | null> {
   try {
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const supabase = createAdminClient();
 
     const since = new Date();
     since.setDate(since.getDate() - 14);
