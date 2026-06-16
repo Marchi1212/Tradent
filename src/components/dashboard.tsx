@@ -358,30 +358,40 @@ export default function Dashboard() {
   return (
     <>
       {/* Header */}
-      <header className="sticky top-0 z-30 flex items-center justify-between px-5 py-4 border-b border-border bg-bg-primary">
-        <img src="/logo.svg" alt="Tradent" className="h-4 shrink-0" />
+      <header className="sticky top-0 z-30 bg-bg-primary">
+        {/* Top Row: Navigation + Balance + Menu */}
+        <div className="flex items-center justify-between px-5 py-3">
+          {/* Left: Trade / History tabs */}
+          <div className="flex items-center gap-4">
+            <button onClick={() => setActiveTab("signals")} className="relative">
+              <span className={`text-[22px] font-bold transition-colors ${activeTab === "signals" ? "text-text-primary" : "text-text-muted/40"}`}>Trade</span>
+            </button>
+            <button onClick={() => setActiveTab("trades")} className="relative">
+              <span className={`text-[22px] font-bold transition-colors ${activeTab === "trades" ? "text-text-primary" : "text-text-muted/40"}`}>History</span>
+              {openTradeCount > 0 && activeTab !== "trades" && (
+                <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-0.5">
+                  {openTradeCount}
+                </span>
+              )}
+            </button>
+          </div>
 
-        {/* Desktop (≥768px) */}
-        <div className="hidden md:flex items-center gap-3">
-          {portfolio ? (
-            <>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
-                {investedAmount > 0 && (
-                  <div className="flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-                    </svg>
-                    <span className="text-sm font-bold text-amber-500">{investedAmount.toFixed(0)}€</span>
-                  </div>
-                )}
+          {/* Right: Balance + Menu */}
+          <div className="flex items-center gap-3">
+            {portfolio && (
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
                 {totalPnl !== 0 && (
-                  <span className={`text-sm font-bold ${totalPnl > 0 ? "text-emerald-500" : "text-red-500"}`}>
+                  <span className={`text-[15px] font-bold ${totalPnl > 0 ? "text-emerald-500" : "text-red-500"}`}>
                     {totalPnl > 0 ? "+" : ""}{totalPnl.toFixed(0)}€
                   </span>
                 )}
               </div>
-              <PortfolioHeader
+            )}
+
+            {/* Mobile Menu */}
+            <div className="md:hidden">
+              <MobileMenu
                 portfolio={portfolio}
                 onUpdate={loadPortfolio}
                 onCreateNew={() => setShowCreatePortfolio(true)}
@@ -391,81 +401,37 @@ export default function Dashboard() {
                 }}
                 onEdit={() => setShowEditPortfolio(true)}
               />
-            </>
-          ) : (
-            <button
-              onClick={() => setShowCreatePortfolio(true)}
-              className="rounded-[6px] bg-accent px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-accent-hover"
-            >
-              Portfolio eröffnen
-            </button>
-          )}
-          <SignOutButton />
-        </div>
-
-        {/* Mobile (<768px) */}
-        <div className="flex md:hidden items-center gap-3">
-          {portfolio && (
-            <div className="flex items-center gap-2.5">
-              <span className="text-lg font-bold text-text-primary">{portfolio.currentBalance.toFixed(0)}€</span>
-              {investedAmount > 0 && (
-                <div className="flex items-center gap-1">
-                  <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-                  </svg>
-                  <span className="text-lg font-bold text-amber-500">{investedAmount.toFixed(0)}€</span>
-                </div>
-              )}
-              {totalPnl !== 0 && (
-                <span className={`text-lg font-bold ${totalPnl > 0 ? "text-emerald-500" : "text-red-500"}`}>
-                  {totalPnl > 0 ? "+" : ""}{totalPnl.toFixed(0)}€
-                </span>
-              )}
             </div>
-          )}
-          <MobileMenu
-            portfolio={portfolio}
-            onUpdate={loadPortfolio}
-            onCreateNew={() => setShowCreatePortfolio(true)}
-            onDeleted={async () => {
-              const p = await getActivePortfolio();
-              setPortfolio(p);
-            }}
-            onEdit={() => setShowEditPortfolio(true)}
-          />
+
+            {/* Desktop extras */}
+            <div className="hidden md:flex items-center gap-2">
+              {investedAmount > 0 && (
+                <span className="text-[15px] font-bold text-amber-500">{investedAmount.toFixed(0)}€ inv.</span>
+              )}
+              {portfolio ? (
+                <PortfolioHeader
+                  portfolio={portfolio}
+                  onUpdate={loadPortfolio}
+                  onCreateNew={() => setShowCreatePortfolio(true)}
+                  onDeleted={async () => {
+                    const p = await getActivePortfolio();
+                    setPortfolio(p);
+                  }}
+                  onEdit={() => setShowEditPortfolio(true)}
+                />
+              ) : (
+                <button
+                  onClick={() => setShowCreatePortfolio(true)}
+                  className="rounded-[6px] bg-accent px-3 py-1.5 text-sm font-bold text-white"
+                >
+                  Portfolio eröffnen
+                </button>
+              )}
+              <SignOutButton />
+            </div>
+          </div>
         </div>
       </header>
-
-      {/* Tab Bar – erst nach Laden zeigen */}
-      {loaded && <div className="px-5 pt-4 pb-2">
-        <div className="flex max-w-[200px] mx-auto rounded-[12px] bg-bg-secondary p-1 gap-1">
-          <button
-            onClick={() => setActiveTab("signals")}
-            className={`flex-1 rounded-[6px] py-2 text-sm font-semibold text-center transition-colors ${
-              activeTab === "signals"
-                ? "bg-bg-primary text-text-primary shadow-sm"
-                : "text-text-muted"
-            }`}
-          >
-            Heute
-          </button>
-          <button
-            onClick={() => setActiveTab("trades")}
-            className={`flex-1 rounded-[6px] py-2 text-sm font-semibold text-center transition-colors relative ${
-              activeTab === "trades"
-                ? "bg-bg-primary text-text-primary shadow-sm"
-                : "text-text-muted"
-            }`}
-          >
-            Verlauf
-            {openTradeCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center px-1">
-                {openTradeCount}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>}
 
       {/* Pull-to-Refresh Indikator */}
       {(pullDistance > 0 || pullRefreshing) && (
@@ -478,28 +444,19 @@ export default function Dashboard() {
 
       {/* Status Bar */}
       {statusBar && (
-        <div className="px-5 w-full max-w-lg mx-auto pt-2">
-          <div className={`rounded-[12px] border overflow-hidden flex items-stretch ${statusBar.now.action ? "border-[#2563EB]/30 bg-[#EFF6FF]" : "border-border bg-bg-secondary"}`}>
-            {/* AKTUELL */}
-            <div
-              className={`flex-1 pr-6 py-3 text-center ${statusBar.now.action ? "bg-[#2563EB]" : "bg-text-primary"}`}
-              style={{ clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)" }}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-0.5">Aktuell</p>
-              <p className="text-sm font-bold text-white truncate">{statusBar.now.label}</p>
+        <div className="px-5 w-full max-w-lg mx-auto pt-1 pb-1">
+          <div className="flex items-center justify-between rounded-[8px] bg-bg-secondary px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <div className={`w-1.5 h-1.5 rounded-full ${statusBar.next.action ? "bg-[#2563EB]" : "bg-text-muted/30"}`} />
+              <span className="text-[13px] font-semibold text-text-primary">{statusBar.now.label}</span>
+              <svg className="w-3 h-3 text-text-muted/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+              <span className={`text-[13px] font-semibold ${statusBar.next.action ? "text-[#2563EB]" : "text-text-muted"}`}>{statusBar.next.label}</span>
             </div>
-            {/* NÄCHSTER SCHRITT */}
-            <div className="flex-1 py-3 text-center">
-              <p className={`text-[10px] font-bold uppercase tracking-widest mb-0.5 ${statusBar.next.action ? "text-[#2563EB]/40" : "text-text-muted/50"}`}>Nächster Schritt</p>
-              <div className="flex items-center justify-center gap-2">
-                <p className={`text-sm font-bold truncate ${statusBar.next.action ? "text-[#2563EB]" : "text-text-primary"}`}>{statusBar.next.label}</p>
-                {statusBar.next.time && (
-                  <span className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full border ${statusBar.next.action ? "text-[#2563EB] bg-[#DBEAFE] border-[#2563EB]/20" : "text-text-primary bg-bg-elevated border-border"}`}>
-                    {statusBar.next.time}
-                  </span>
-                )}
-              </div>
-            </div>
+            {statusBar.next.time && (
+              <span className="text-[12px] font-semibold text-text-muted">{statusBar.next.time}</span>
+            )}
           </div>
         </div>
       )}
