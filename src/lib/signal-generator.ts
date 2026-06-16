@@ -81,17 +81,40 @@ SCHRITT 3 — SL/TP via ATR (PFLICHT):
 
 SCHRITT 4 — KONFIDENZ berechnen:
 Starte bei 60% Basis, dann addiere/subtrahiere:
+
+RSI-Signal:
 +10% wenn RSI14 < 30 oder > 70 (starkes Signal)
++5%  wenn RSI14 < 25 oder > 75 (zusätzlich zu obigen +10% = gesamt +15%)
+
+Trend-Bestätigung:
 +10% wenn Kurs-Trend (1T UND 5T) die Richtung bestätigt
-+5%  wenn Kurs nahe Support (LONG) oder Resistance (SHORT)
--5%  wenn Kurs nahe Resistance (LONG) oder Support (SHORT) = gegen Level
-+5%  wenn MACD-Histogramm wächst (zunehmendes Momentum)
-+5%  wenn Volumen-Ratio > 1.5 (überdurchschnittliches Interesse)
-+5%  wenn Kurs außerhalb Bollinger Bands (statistisch extrem)
+
+Support/Resistance (gestaffelt nach Nähe):
++10% wenn Kurs innerhalb 0.5x ATR von Support (LONG) oder Resistance (SHORT)
++5%  wenn Kurs innerhalb 1x ATR von Support (LONG) oder Resistance (SHORT)
+-10% wenn Kurs innerhalb 0.5x ATR von Resistance (LONG) oder Support (SHORT)
+-5%  wenn Kurs innerhalb 1x ATR von Resistance (LONG) oder Support (SHORT)
+
+MACD-Momentum (gestaffelt):
++5%  wenn MACD-Histogramm die Richtung bestätigt
++10% wenn MACD-Histogramm wächst (zunehmendes Momentum, stärker als nur bestätigt)
+
+Volumen (gestaffelt — stärkster Bestätigungs-Indikator):
++5%  wenn Volumen-Ratio > 1.5
++10% wenn Volumen-Ratio > 3.0 (statt +5%)
++15% wenn Volumen-Ratio > 5.0 (statt +5% oder +10%)
+
+Bollinger Bands (gestaffelt):
++5%  wenn Kurs nahe Bollinger Band (innerhalb 1 Standardabweichung vom Band)
++10% wenn Kurs außerhalb Bollinger Bands (statistisch extrem, starkes Mean-Reversion-Signal)
+
+Negative Faktoren:
 -10% wenn Kurs gegen SMA20-Trend geht
 -20% wenn High-Impact Wirtschaftsevent heute
 -10% wenn Fear & Greed > 80 (bei LONG) oder < 20 (bei SHORT)
 +5%  wenn Fear & Greed < 20 (bei LONG) oder > 80 (bei SHORT) = Kontraindikator
+
+WICHTIG: Stufen sind NICHT kumulativ (nimm die höchste zutreffende Stufe pro Indikator).
 → Ergebnis auf 40-95% begrenzen.
 
 SCHRITT 5 — AUSWAHL:
@@ -136,8 +159,8 @@ SCHRITT 3 — SL/TP via ATR:
 
 SCHRITT 4 — KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
-+5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
++5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
++5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
 -10% gegen SMA20 | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
@@ -181,8 +204,8 @@ SCHRITT 3 — SL/TP via ATR:
 
 SCHRITT 4 — KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
-+5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
++5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
++5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
 -10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
@@ -225,8 +248,8 @@ SCHRITT 3 — SL/TP via ATR:
 
 SCHRITT 4 — KONFIDENZ (Basis 60%, dann -5% wegen reduzierter Liquidität):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
-+5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
++5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
++5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
 -10% gegen SMA20 | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
@@ -270,8 +293,8 @@ SCHRITT 3 — SL/TP via ATR:
 
 SCHRITT 4 — KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
-+5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
++5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
++5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
 -10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
@@ -483,8 +506,8 @@ RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen (positiv=LONG,
 
 SCHRITT 3 — VORLÄUFIGE KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
-+5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
++5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
++5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
 -10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
