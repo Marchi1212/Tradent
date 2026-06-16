@@ -43,11 +43,10 @@ export async function GET() {
 
     return NextResponse.json({ candidates });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
-    console.error("Scan fehlgeschlagen:", msg, stack);
+    const msg = err instanceof Error ? err.message : JSON.stringify(err);
+    console.error("Scan fehlgeschlagen:", msg);
     return NextResponse.json(
-      { error: msg, stack: stack?.split("\n").slice(0, 5) },
+      { error: msg },
       { status: 500 }
     );
   }
