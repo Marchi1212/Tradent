@@ -143,22 +143,25 @@ export default function Dashboard() {
   const checkOpenTrades = useCallback(async () => {
     if (!signals || !portfolio) return;
     const openIds = new Set<string>();
+    let todayCount = 0;
     let todayInvested = 0;
     for (const s of [signals.steady, signals.bold]) {
       const trade = await getOpenTradeForSignal(portfolio.id, s.id);
       if (trade) {
         openIds.add(s.id);
+        todayCount++;
         todayInvested += trade.budget || 0;
       }
     }
     setOpenTradeSignals(openIds);
 
     try {
-      const allOpen = await getOpenTrades(portfolio.id);
-      setOpenTradeCount(allOpen.length);
-      const overdueInvested = allOpen.reduce((sum, t) => sum + (t.budget || 0), 0);
+      const overdueOpen = await getOpenTrades(portfolio.id);
+      setOpenTradeCount(overdueOpen.length + todayCount);
+      const overdueInvested = overdueOpen.reduce((sum, t) => sum + (t.budget || 0), 0);
       setInvestedAmount(overdueInvested + todayInvested);
     } catch {
+      setOpenTradeCount(todayCount);
       setInvestedAmount(todayInvested);
     }
   }, [signals, portfolio]);
