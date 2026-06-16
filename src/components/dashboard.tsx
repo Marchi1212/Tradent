@@ -140,32 +140,32 @@ export default function Dashboard() {
   }, [portfolio]);
 
   // Offene Trades prüfen (damit Karten trotz niedriger Konfidenz sichtbar bleiben)
-  useEffect(() => {
+  const checkOpenTrades = useCallback(async () => {
     if (!signals || !portfolio) return;
-    async function checkOpenTrades() {
-      const openIds = new Set<string>();
-      let todayInvested = 0;
-      for (const s of [signals!.steady, signals!.bold]) {
-        const trade = await getOpenTradeForSignal(portfolio!.id, s.id);
-        if (trade) {
-          openIds.add(s.id);
-          todayInvested += trade.budget || 0;
-        }
-      }
-      setOpenTradeSignals(openIds);
-
-      // Überfällige offene Trades + heutige zusammenzählen
-      try {
-        const allOpen = await getOpenTrades(portfolio!.id);
-        setOpenTradeCount(allOpen.length);
-        const overdueInvested = allOpen.reduce((sum, t) => sum + (t.budget || 0), 0);
-        setInvestedAmount(overdueInvested + todayInvested);
-      } catch {
-        setInvestedAmount(todayInvested);
+    const openIds = new Set<string>();
+    let todayInvested = 0;
+    for (const s of [signals.steady, signals.bold]) {
+      const trade = await getOpenTradeForSignal(portfolio.id, s.id);
+      if (trade) {
+        openIds.add(s.id);
+        todayInvested += trade.budget || 0;
       }
     }
-    checkOpenTrades();
+    setOpenTradeSignals(openIds);
+
+    try {
+      const allOpen = await getOpenTrades(portfolio.id);
+      setOpenTradeCount(allOpen.length);
+      const overdueInvested = allOpen.reduce((sum, t) => sum + (t.budget || 0), 0);
+      setInvestedAmount(overdueInvested + todayInvested);
+    } catch {
+      setInvestedAmount(todayInvested);
+    }
   }, [signals, portfolio]);
+
+  useEffect(() => {
+    checkOpenTrades();
+  }, [checkOpenTrades]);
 
   // Auto-Refresh wenn App in den Vordergrund kommt (PWA)
   const refreshAll = useCallback(() => {
@@ -292,7 +292,7 @@ export default function Dashboard() {
         (signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id));
       if (hasVisibleSignal) {
         return {
-          now: { label: "Empfehlungen bereit", action: true },
+          now: { label: "Empfehlungen bereit" },
           next: { label: "Trade eröffnen", action: true },
         };
       }
@@ -601,7 +601,7 @@ export default function Dashboard() {
             ) : signals ? (
               <div className="space-y-4">
                 {signals.steady.confidence >= 70 || openTradeSignals.has(signals.steady.id) ? (
-                  <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={loadPortfolio} />
+                  <SignalCard signal={signals.steady} portfolio={portfolio} allocatedBudget={allocations[0]} onPortfolioUpdate={() => { loadPortfolio(); checkOpenTrades(); }} />
                 ) : (
                   <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
                     <p className="text-sm font-semibold text-text-primary">Kein Steady-Signal heute</p>
@@ -609,7 +609,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 {signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id) ? (
-                  <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={loadPortfolio} />
+                  <SignalCard signal={signals.bold} portfolio={portfolio} allocatedBudget={allocations[1]} onPortfolioUpdate={() => { loadPortfolio(); checkOpenTrades(); }} />
                 ) : (
                   <div className="rounded-[12px] bg-bg-secondary px-5 py-6 text-center">
                     <p className="text-sm font-semibold text-text-primary">Kein Bold-Signal heute</p>
@@ -620,7 +620,7 @@ export default function Dashboard() {
             ) : null}
           </>
         ) : portfolio ? (
-          <TradeHistory portfolio={portfolio} onPortfolioUpdate={loadPortfolio} />
+          <TradeHistory portfolio={portfolio} onPortfolioUpdate={() => { loadPortfolio(); checkOpenTrades(); }} />
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-sm font-semibold text-text-primary">Kein Portfolio aktiv</p>
