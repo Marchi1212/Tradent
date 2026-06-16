@@ -469,21 +469,17 @@ export default function Dashboard() {
       {/* Status Bar */}
       {statusBar && (
         <div className="px-5 w-full max-w-lg mx-auto pt-2">
-          <div className="rounded-[12px] border border-border overflow-hidden flex items-stretch relative">
-            {/* AKTUELL — dunkel */}
-            <div className="flex-1 bg-text-primary pl-4 pr-5 py-3 relative z-10">
+          <div className="rounded-[12px] border border-border overflow-hidden flex items-stretch bg-bg-secondary">
+            {/* AKTUELL — dunkel mit Pfeilspitze rechts */}
+            <div
+              className="flex-1 bg-text-primary pl-4 pr-6 py-3"
+              style={{ clipPath: "polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)" }}
+            >
               <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-0.5">Aktuell</p>
               <p className="text-sm font-bold text-white truncate">{statusBar.now.label}</p>
             </div>
-            {/* Pfeil-Trennung */}
-            <div className="relative z-20 flex items-center -ml-3 -mr-3">
-              <svg width="24" height="100%" viewBox="0 0 24 48" preserveAspectRatio="none" className="h-full">
-                <path d="M0,0 L18,24 L0,48" fill="var(--color-text-primary)" />
-                <path d="M2,0 L20,24 L2,48" fill="var(--color-bg-secondary)" />
-              </svg>
-            </div>
             {/* NÄCHSTER SCHRITT — hell */}
-            <div className="flex-1 bg-bg-secondary pl-3 pr-4 py-3 relative z-10">
+            <div className="flex-1 pl-2 pr-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted/50 mb-0.5">Nächster Schritt</p>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-bold text-text-primary truncate">{statusBar.next.label}</p>
