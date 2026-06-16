@@ -693,6 +693,41 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
   parsed.steady.riskClass = "steady";
   parsed.bold.riskClass = "bold";
 
+  // Diversitäts-Check: Steady und Bold MÜSSEN verschiedene Assets sein
+  if (parsed.steady.ticker === parsed.bold.ticker || parsed.steady.asset === parsed.bold.asset) {
+    console.warn(`Gleiches Asset für beide: ${parsed.steady.asset} — ersetze Bold durch nächstbesten Kandidaten`);
+    const alternativeAssets = analyzed.filter(
+      a => a.data.ticker !== parsed.steady.ticker && a.analysis.direction !== null && a.analysis.confidence >= 50
+    );
+    if (alternativeAssets.length > 0) {
+      const alt = alternativeAssets[0];
+      const d = alt.data;
+      const a = alt.analysis;
+      const entry = d.currentPrice;
+      const atr = d.atr14 ?? entry * 0.02;
+      const dir = a.direction as "LONG" | "SHORT";
+      parsed.bold = {
+        asset: d.name,
+        ticker: d.ticker,
+        direction: dir,
+        riskClass: "bold",
+        leverage: a.confidence >= 65 ? "7x" : "5x",
+        entry,
+        stopLoss: dir === "LONG" ? +(entry - atr).toFixed(4) : +(entry + atr).toFixed(4),
+        takeProfit: dir === "LONG" ? +(entry + 1.5 * atr).toFixed(4) : +(entry - 1.5 * atr).toFixed(4),
+        confidence: a.confidence,
+        expectedGainPercent: +(((1.5 * atr) / entry) * 100 * (a.confidence >= 65 ? 7 : 5)).toFixed(1),
+        riskRewardRatio: "1:1.5",
+        reasoning: `${d.name} ${dir}: ${a.reasons.join(", ")}. Auto-Ersatz wegen Diversitätsregel.`,
+        market: d.category === "Krypto" ? "Krypto" : d.category === "Forex" ? "Forex" : d.category === "Rohstoff" ? "Rohstoff" : "Aktie",
+        marketCloseTime: d.category === "Krypto" ? "23:59" : "22:00",
+        optimalEntry: "14:00–16:00",
+        category: d.category,
+      };
+      console.log(`Bold ersetzt durch: ${parsed.bold.asset} (${parsed.bold.direction})`);
+    }
+  }
+
   // SL-Mindestabstände erzwingen (ATR-basiert, Fallback auf feste %)
   enforceMinSlDistance(parsed.steady, allMarketData);
   enforceMinSlDistance(parsed.bold, allMarketData);
