@@ -492,7 +492,8 @@ SCHRITT 4 — TOP 4-6 nach Konfidenz auswählen
 - Mindestens 1 SHORT dabei wenn möglich
 - Verschiedene Asset-Klassen bevorzugen (KORRELATIONS-CHECK: keine zwei stark korrelierten Assets)
 
-Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text davor oder danach:
+Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text davor oder danach.
+WICHTIG: "note" maximal 80 Zeichen — nur Schlüsselindikatoren nennen (RSI, MACD, Volumen-Ratio, BB), keine ganzen Sätze.
 {
   "candidates": [
     {
@@ -502,7 +503,7 @@ Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text d
       "market": "XETRA",
       "direction": "LONG",
       "confidence": 72,
-      "note": "RSI 32 + unter SMA20, überverkauft. ATR 1.2%."
+      "note": "RSI 32, MACD +0.5, Vol 1.8x, unter BB-Unten. ATR 1.2%."
     }
   ]
 }`;
