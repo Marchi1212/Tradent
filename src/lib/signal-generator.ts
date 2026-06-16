@@ -25,11 +25,25 @@ export interface GeneratedSignal {
 function formatMarketDataForPrompt(data: AssetMarketData[]): string {
   return data
     .map(
-      (d) =>
-        `${d.name} (${d.ticker}) | ${d.category} | ${d.market}
+      (d) => {
+        const macdStr = d.macd
+          ? `MACD: ${d.macd.macd} | Signal: ${d.macd.signal} | Histogramm: ${d.macd.histogram}`
+          : "MACD: n/a";
+        const bbStr = d.bollingerBands
+          ? `BB-Oben: ${d.bollingerBands.upper} | BB-Unten: ${d.bollingerBands.lower} | BB-Breite: ${d.bollingerBands.width}%`
+          : "Bollinger: n/a";
+        const volStr = d.volume
+          ? `Volumen: ${(d.volume.current / 1e6).toFixed(1)}M | Ø20T: ${(d.volume.avg20 / 1e6).toFixed(1)}M | Ratio: ${d.volume.ratio}x`
+          : "Volumen: n/a";
+        return `${d.name} (${d.ticker}) | ${d.category} | ${d.market}
   Kurs: ${d.currentPrice} | 1T: ${d.change1dPercent > 0 ? "+" : ""}${d.change1dPercent}% | 5T: ${d.change5dPercent > 0 ? "+" : ""}${d.change5dPercent}%
   5T-Hoch: ${d.high5d} | 5T-Tief: ${d.low5d} | SMA20: ${d.sma20 ?? "n/a"} | RSI14: ${d.rsi14 ?? "n/a"}
-  ATR14: ${d.atr14 ?? "n/a"} (${d.atr14Percent != null ? d.atr14Percent + "%" : "n/a"} vom Kurs)`
+  ATR14: ${d.atr14 ?? "n/a"} (${d.atr14Percent != null ? d.atr14Percent + "%" : "n/a"} vom Kurs)
+  ${macdStr}
+  ${bbStr}
+  ${volStr}
+  Support: ${d.support ?? "n/a"} | Resistance: ${d.resistance ?? "n/a"}`;
+      }
     )
     .join("\n\n");
 }
@@ -42,6 +56,7 @@ SCHRITT 1 — FILTER (Assets eliminieren):
 Eliminiere jedes Asset das EINE dieser Bedingungen erfüllt:
 - RSI14 zwischen 45-55 (kein klares Signal, Seitwärtsmarkt)
 - ATR14% < 0.3% (zu wenig Tagesbewegung für Daytrading)
+- Volumen-Ratio < 0.5 (deutlich unterdurchschnittlich = kein Interesse)
 - Earnings HEUTE oder MORGEN (zu unberechenbar)
 - NEWS-VETO aktiv (siehe News-Block)
 → Nur Assets die ALLE Filter bestehen kommen in Frage.
@@ -53,18 +68,26 @@ Für jedes verbleibende Asset:
 - RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend-Fortsetzung)
 - RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend-Fortsetzung)
 - Wenn keine Regel passt → Asset überspringen
+RICHTUNGS-BESTÄTIGUNG (PFLICHT):
+- MACD-Histogramm muss Richtung bestätigen: positiv für LONG, negativ für SHORT
+- Wenn MACD gegen die Richtung steht → Asset überspringen (kein Momentum)
 
 SCHRITT 3 — SL/TP via ATR (PFLICHT):
 - Stop-Loss = 1x ATR14 vom Entry entfernt (LONG: Entry - ATR14, SHORT: Entry + ATR14)
 - Take-Profit = 1.5x ATR14 vom Entry entfernt (LONG: Entry + 1.5×ATR14, SHORT: Entry - 1.5×ATR14)
 - Risk-Reward-Ratio ergibt sich automatisch: 1:1.5
+- Prüfe Support/Resistance: SL NICHT auf der falschen Seite eines Levels setzen (SL bei LONG sollte unter Support liegen, nicht zwischen Entry und Support)
 - Wenn ATR14 nicht verfügbar → Asset überspringen
 
 SCHRITT 4 — KONFIDENZ berechnen:
 Starte bei 60% Basis, dann addiere/subtrahiere:
 +10% wenn RSI14 < 30 oder > 70 (starkes Signal)
 +10% wenn Kurs-Trend (1T UND 5T) die Richtung bestätigt
-+5%  wenn Kurs nahe 5T-Hoch (SHORT) oder 5T-Tief (LONG) = Support/Resistance
++5%  wenn Kurs nahe Support (LONG) oder Resistance (SHORT)
+-5%  wenn Kurs nahe Resistance (LONG) oder Support (SHORT) = gegen Level
++5%  wenn MACD-Histogramm wächst (zunehmendes Momentum)
++5%  wenn Volumen-Ratio > 1.5 (überdurchschnittliches Interesse)
++5%  wenn Kurs außerhalb Bollinger Bands (statistisch extrem)
 -10% wenn Kurs gegen SMA20-Trend geht
 -20% wenn High-Impact Wirtschaftsevent heute
 -10% wenn Fear & Greed > 80 (bei LONG) oder < 20 (bei SHORT)
@@ -76,6 +99,7 @@ SCHRITT 5 — AUSWAHL:
 - STEADY = höchste Konfidenz, Hebel 2x-5x (Konfidenz muss ≥70%)
 - BOLD = zweithöchste Konfidenz, Hebel 5x-10x (Konfidenz muss ≥50%)
 - Beide Assets MÜSSEN unterschiedlich sein
+- KORRELATIONS-CHECK: Wenn beide Assets stark korreliert sind (gleicher Sektor, gleiche Region, gleiche Bewegungsrichtung in den letzten 5 Tagen), ersetze das schwächere durch das nächstbeste unkorrelierte Asset
 - LONG und SHORT sind BEIDE erwünscht — kein Bias!
 
 ═══ REGELN ═══
@@ -84,7 +108,7 @@ SCHRITT 5 — AUSWAHL:
 - expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
 - optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität. MAXIMAL 2 Stunden breit! Bevorzuge 14:00-17:00 CET (London-NY-Overlap = höchste Liquidität).
 - marketCloseTime = XTB-Handelsschluss (z.B. "22:00" für EU-Index-CFDs, "23:00" für US-Index-CFDs, "17:30" für EU-Aktien, "22:00" für US-Aktien)
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben (inkl. MACD, Volumen, Bollinger wenn relevant)
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -95,6 +119,7 @@ const SYSTEM_PROMPT_WEEKEND = `Du bist ein regelbasierter Krypto-Daytrading-Anal
 SCHRITT 1 — FILTER:
 - RSI14 zwischen 45-55 → eliminieren
 - ATR14% < 0.3% → eliminieren
+- Volumen-Ratio < 0.5 → eliminieren
 - NEWS-VETO aktiv → eliminieren
 
 SCHRITT 2 — RICHTUNG:
@@ -102,20 +127,24 @@ SCHRITT 2 — RICHTUNG:
 - RSI14 > 65 UND Kurs > SMA20 → SHORT
 - RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
 - RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen (positiv=LONG, negativ=SHORT). Sonst überspringen.
 
 SCHRITT 3 — SL/TP via ATR:
 - SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Prüfe Support/Resistance-Level bei SL-Platzierung
 - Kein ATR → Asset überspringen
 
 SCHRITT 4 — KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Support/Resistance | -10% gegen SMA20
--10% F&G Kontraindikator gegen Richtung | +5% F&G für Richtung
++5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
++5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
+-10% gegen SMA20 | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
 SCHRITT 5 — AUSWAHL:
 - STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
 - BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein (nicht zwei ähnliche Kryptos)
 - Krypto-Wochenend-Volatilität beachten (oft niedriger, plötzliche Spikes)
 
 ═══ REGELN ═══
@@ -123,7 +152,7 @@ SCHRITT 5 — AUSWAHL:
 - expectedGainPercent = Gewinn bei TP MIT Hebel
 - optimalEntry = 2h-Zeitfenster, MAXIMAL 2 Stunden breit
 - marketCloseTime = "21:00" (Trade abends schließen)
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -134,6 +163,7 @@ const SYSTEM_PROMPT_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst
 SCHRITT 1 — FILTER:
 - RSI14 zwischen 45-55 → eliminieren
 - ATR14% < 0.3% → eliminieren
+- Volumen-Ratio < 0.5 → eliminieren
 - Earnings HEUTE/MORGEN → eliminieren
 - NEWS-VETO aktiv → eliminieren
 
@@ -142,20 +172,24 @@ SCHRITT 2 — RICHTUNG:
 - RSI14 > 65 UND Kurs > SMA20 → SHORT
 - RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
 - RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen. Sonst überspringen.
 
 SCHRITT 3 — SL/TP via ATR:
 - SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Prüfe Support/Resistance-Level bei SL-Platzierung
 - Kein ATR → Asset überspringen
 
 SCHRITT 4 — KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Support/Resistance | -10% gegen SMA20
--20% High-Impact Event heute | -10% F&G Kontraindikator | +5% F&G für Richtung
++5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
++5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
+-10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
 SCHRITT 5 — AUSWAHL:
 - STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
 - BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein
 - Nur VERFÜGBARE Märkte (kein XETRA)
 
 ═══ REGELN ═══
@@ -163,7 +197,7 @@ SCHRITT 5 — AUSWAHL:
 - expectedGainPercent = Gewinn bei TP MIT Hebel
 - optimalEntry = 2h-Zeitfenster, bevorzuge 14:00-17:00 CET
 - marketCloseTime = XTB-Handelsschluss
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -174,6 +208,7 @@ const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-
 SCHRITT 1 — FILTER:
 - RSI14 zwischen 45-55 → eliminieren
 - ATR14% < 0.3% → eliminieren
+- Volumen-Ratio < 0.5 → eliminieren
 - NEWS-VETO aktiv → eliminieren
 
 SCHRITT 2 — RICHTUNG:
@@ -181,20 +216,24 @@ SCHRITT 2 — RICHTUNG:
 - RSI14 > 65 UND Kurs > SMA20 → SHORT
 - RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
 - RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen. Sonst überspringen.
 
 SCHRITT 3 — SL/TP via ATR:
 - SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Prüfe Support/Resistance-Level bei SL-Platzierung
 - Kein ATR → Asset überspringen
 
 SCHRITT 4 — KONFIDENZ (Basis 60%, dann -5% wegen reduzierter Liquidität):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Support/Resistance | -10% gegen SMA20
--10% F&G Kontraindikator | +5% F&G für Richtung
++5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
++5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
+-10% gegen SMA20 | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
 SCHRITT 5 — AUSWAHL:
 - STEADY = höchste Konfidenz, 2x-3x Hebel (≥70%, konservativer wegen Feiertag)
 - BOLD = zweithöchste, 3x-7x Hebel (≥50%)
+- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein
 - NUR Forex und Krypto — KEINE Rohstoffe
 
 ═══ REGELN ═══
@@ -202,7 +241,7 @@ SCHRITT 5 — AUSWAHL:
 - expectedGainPercent = Gewinn bei TP MIT Hebel
 - optimalEntry = 2h-Zeitfenster
 - marketCloseTime = XTB-Handelsschluss
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -213,6 +252,7 @@ const SYSTEM_PROMPT_US_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Anal
 SCHRITT 1 — FILTER:
 - RSI14 zwischen 45-55 → eliminieren
 - ATR14% < 0.3% → eliminieren
+- Volumen-Ratio < 0.5 → eliminieren
 - Earnings HEUTE/MORGEN → eliminieren
 - NEWS-VETO aktiv → eliminieren
 
@@ -221,20 +261,24 @@ SCHRITT 2 — RICHTUNG:
 - RSI14 > 65 UND Kurs > SMA20 → SHORT
 - RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
 - RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
+RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen. Sonst überspringen.
 
 SCHRITT 3 — SL/TP via ATR:
 - SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
+- Prüfe Support/Resistance-Level bei SL-Platzierung
 - Kein ATR → Asset überspringen
 
 SCHRITT 4 — KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Support/Resistance | -10% gegen SMA20
--20% High-Impact Event heute | -10% F&G Kontraindikator | +5% F&G für Richtung
++5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
++5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
+-10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
 SCHRITT 5 — AUSWAHL:
 - STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
 - BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein
 - Nur VERFÜGBARE Märkte (kein US)
 
 ═══ REGELN ═══
@@ -242,7 +286,7 @@ SCHRITT 5 — AUSWAHL:
 - expectedGainPercent = Gewinn bei TP MIT Hebel
 - optimalEntry = 2h-Zeitfenster, bevorzuge 09:00-11:00 CET für EU, 14:00-16:00 für Forex/Rohstoffe
 - marketCloseTime = XTB-Handelsschluss
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln den Trade ausgelöst haben
+- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -426,6 +470,7 @@ WICHTIG: Antworte NUR mit validem JSON. Kein Markdown, keine Code-Blöcke, kein 
 SCHRITT 1 — FILTER (Assets eliminieren):
 - RSI14 zwischen 45-55 → eliminieren
 - ATR14% < 0.3% → eliminieren
+- Volumen-Ratio < 0.5 → eliminieren (kein Marktinteresse)
 - Earnings HEUTE oder MORGEN → eliminieren
 - NEWS-VETO aktiv → eliminieren
 
@@ -434,16 +479,18 @@ SCHRITT 2 — RICHTUNG bestimmen:
 - RSI14 > 65 UND Kurs > SMA20 → SHORT-Tendenz
 - RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG-Tendenz
 - RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT-Tendenz
+RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen (positiv=LONG, negativ=SHORT). Sonst überspringen.
 
 SCHRITT 3 — VORLÄUFIGE KONFIDENZ (Basis 60%):
 +10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5% Support/Resistance | -10% gegen SMA20
--20% High-Impact Event heute | -10% F&G Kontraindikator | +5% F&G für Richtung
++5% Kurs nahe Support (LONG) oder Resistance (SHORT) | -5% gegen Level
++5% MACD-Histogramm wächst | +5% Volumen-Ratio > 1.5 | +5% außerhalb Bollinger Bands
+-10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
 → Begrenzen auf 40-95%.
 
 SCHRITT 4 — TOP 4-6 nach Konfidenz auswählen
 - Mindestens 1 SHORT dabei wenn möglich
-- Verschiedene Asset-Klassen bevorzugen
+- Verschiedene Asset-Klassen bevorzugen (KORRELATIONS-CHECK: keine zwei stark korrelierten Assets)
 
 Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text davor oder danach:
 {

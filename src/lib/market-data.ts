@@ -127,6 +127,11 @@ export interface AssetMarketData {
   rsi14: number | null;
   atr14: number | null;
   atr14Percent: number | null;
+  macd: { macd: number; signal: number; histogram: number } | null;
+  bollingerBands: { upper: number; lower: number; width: number } | null;
+  volume: { current: number; avg20: number; ratio: number } | null;
+  support: number | null;
+  resistance: number | null;
 }
 
 // RSI berechnen (14 Perioden)
@@ -174,6 +179,68 @@ function calculateSMA(closes: number[], period: number): number | null {
   return Math.round((slice.reduce((a, b) => a + b, 0) / period) * 100) / 100;
 }
 
+// MACD (12/26/9)
+function calculateMACD(closes: number[]): { macd: number; signal: number; histogram: number } | null {
+  if (closes.length < 35) return null;
+
+  function ema(data: number[], period: number): number[] {
+    const k = 2 / (period + 1);
+    const result = [data[0]];
+    for (let i = 1; i < data.length; i++) {
+      result.push(data[i] * k + result[i - 1] * (1 - k));
+    }
+    return result;
+  }
+
+  const ema12 = ema(closes, 12);
+  const ema26 = ema(closes, 26);
+  const macdLine = ema12.map((v, i) => v - ema26[i]);
+  const signalLine = ema(macdLine.slice(26), 9);
+  const macdVal = macdLine[macdLine.length - 1];
+  const signalVal = signalLine[signalLine.length - 1];
+  return {
+    macd: Math.round(macdVal * 10000) / 10000,
+    signal: Math.round(signalVal * 10000) / 10000,
+    histogram: Math.round((macdVal - signalVal) * 10000) / 10000,
+  };
+}
+
+// Bollinger Bands (20 Perioden, 2 Standardabweichungen)
+function calculateBollinger(closes: number[]): { upper: number; lower: number; width: number } | null {
+  if (closes.length < 20) return null;
+  const slice = closes.slice(-20);
+  const mean = slice.reduce((a, b) => a + b, 0) / 20;
+  const variance = slice.reduce((sum, v) => sum + (v - mean) ** 2, 0) / 20;
+  const stdDev = Math.sqrt(variance);
+  const upper = Math.round((mean + 2 * stdDev) * 100) / 100;
+  const lower = Math.round((mean - 2 * stdDev) * 100) / 100;
+  const width = mean > 0 ? Math.round(((upper - lower) / mean) * 10000) / 100 : 0;
+  return { upper, lower, width };
+}
+
+// Volumen-Analyse
+function calculateVolume(volumes: number[]): { current: number; avg20: number; ratio: number } | null {
+  if (volumes.length < 20) return null;
+  const current = volumes[volumes.length - 1];
+  const avg20 = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  if (avg20 === 0) return null;
+  return {
+    current: Math.round(current),
+    avg20: Math.round(avg20),
+    ratio: Math.round((current / avg20) * 100) / 100,
+  };
+}
+
+// Support/Resistance aus 30-Tage-Hochs/Tiefs
+function calculateSupportResistance(highs: number[], lows: number[]): { support: number | null; resistance: number | null } {
+  if (highs.length < 10 || lows.length < 10) return { support: null, resistance: null };
+  const recentHighs = highs.slice(-30);
+  const recentLows = lows.slice(-30);
+  const resistance = Math.round(Math.max(...recentHighs) * 100) / 100;
+  const support = Math.round(Math.min(...recentLows) * 100) / 100;
+  return { support, resistance };
+}
+
 // Einzelnes Asset von Yahoo Finance laden
 async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData | null> {
   try {
@@ -196,6 +263,9 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
     const highs: number[] = (result.indicators?.quote?.[0]?.high || []).filter(
       (h: number | null) => h != null
     );
+    const volumes: number[] = (result.indicators?.quote?.[0]?.volume || []).filter(
+      (v: number | null) => v != null
+    );
     const lows: number[] = (result.indicators?.quote?.[0]?.low || []).filter(
       (l: number | null) => l != null
     );
@@ -211,6 +281,7 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
 
     const atr14 = calculateATR(highs, lows, closes);
     const atr14Percent = atr14 && currentPrice ? Math.round((atr14 / currentPrice) * 10000) / 100 : null;
+    const sr = calculateSupportResistance(highs, lows);
 
     return {
       name: asset.name,
@@ -226,6 +297,11 @@ async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData 
       rsi14: calculateRSI(closes),
       atr14,
       atr14Percent,
+      macd: calculateMACD(closes),
+      bollingerBands: calculateBollinger(closes),
+      volume: calculateVolume(volumes),
+      support: sr.support,
+      resistance: sr.resistance,
     };
   } catch (err) {
     console.error(`Marktdaten für ${asset.symbol} fehlgeschlagen:`, err);
