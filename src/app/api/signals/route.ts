@@ -7,11 +7,23 @@ export const maxDuration = 60;
 
 export async function GET() {
   try {
-    // 1. Prüfen ob heute schon finale Signale existieren
-    const existing = await getTodaySignals();
-    if (existing) {
-      return NextResponse.json({ signals: existing });
-    }
+    // TEMP: Force-Regeneration — alte Signale löschen
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const supabase = createAdminClient();
+    const todayStr = new Date().toISOString().split("T")[0];
+    const { data: deleted } = await supabase
+      .from("signals")
+      .delete()
+      .eq("date", todayStr)
+      .eq("session", "daily")
+      .select();
+    console.log("TEMP: Deleted", deleted?.length || 0, "old signals");
+
+    // 1. Prüfen ob heute schon finale Signale existieren (skip — just deleted)
+    // const existing = await getTodaySignals();
+    // if (existing) {
+    //   return NextResponse.json({ signals: existing });
+    // }
 
     // 2. Zeitpunkt + Tagestyp prüfen
     const now = new Date();
