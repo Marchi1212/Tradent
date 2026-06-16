@@ -91,19 +91,13 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.waitUntil) {
         setSignalsWaitUntil(data.waitUntil);
-        // Wenn Signale warten (Wochentag vor 13:30): Scan-Kandidaten laden
+        setSignalsLoading(false);
+        // Scan-Kandidaten im Hintergrund laden (kann 30s+ dauern)
         if (data.waitUntil === "13:30") {
-          try {
-            const scanRes = await fetch("/api/signals/scan");
-            if (scanRes.ok) {
-              const scanData = await scanRes.json();
-              if (scanData.candidates) {
-                setScanCandidates(scanData.candidates);
-              }
-            }
-          } catch {
-            // Scan-Fehler ist nicht kritisch
-          }
+          fetch("/api/signals/scan")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.candidates) setScanCandidates(d.candidates); })
+            .catch(() => {});
         }
         return;
       }
