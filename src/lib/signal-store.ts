@@ -144,7 +144,7 @@ export async function saveScanCandidates(candidates: ScanCandidate[]): Promise<v
   const rows = candidates.map((c, i) => ({
     date: today,
     session: "scan",
-    risk_class: `candidate_${i}`,
+    risk_class: i % 2 === 0 ? "steady" : "bold",
     asset: c.asset,
     ticker: c.ticker,
     direction: c.direction,
