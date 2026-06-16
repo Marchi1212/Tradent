@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Signal } from "@/lib/mock-signals";
-import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, getOpenTrades, getRiskMultiplier, type Portfolio } from "@/lib/portfolio-store";
+import { getActivePortfolio, allocateCapital, getOpenTradeForSignal, getTradeForSignal, getOpenTrades, getRiskMultiplier, type Portfolio } from "@/lib/portfolio-store";
 import SignalCard from "./signal-card";
 import TradeHistory from "./trade-history";
 import CreatePortfolio from "./create-portfolio";
@@ -62,6 +62,7 @@ export default function Dashboard() {
   const [notifState, setNotifState] = useState<"unknown" | "granted" | "denied" | "prompt" | "unsupported">("unknown");
   const [openTradeSignals, setOpenTradeSignals] = useState<Set<string>>(new Set());
   const [openTradeCount, setOpenTradeCount] = useState(0);
+  const [allTradesClosed, setAllTradesClosed] = useState(false);
   const [investedAmount, setInvestedAmount] = useState(0);
   const [scanCandidates, setScanCandidates] = useState<ScanCandidate[] | null>(null);
   const [riskMultiplier, setRiskMultiplier] = useState(1.0);
@@ -145,15 +146,20 @@ export default function Dashboard() {
     const openIds = new Set<string>();
     let todayCount = 0;
     let todayInvested = 0;
+    let closedCount = 0;
     for (const s of [signals.steady, signals.bold]) {
-      const trade = await getOpenTradeForSignal(portfolio.id, s.id);
-      if (trade) {
+      const openTrade = await getOpenTradeForSignal(portfolio.id, s.id);
+      if (openTrade) {
         openIds.add(s.id);
         todayCount++;
-        todayInvested += trade.budget || 0;
+        todayInvested += openTrade.budget || 0;
+      } else {
+        const anyTrade = await getTradeForSignal(portfolio.id, s.id);
+        if (anyTrade && anyTrade.status === "closed") closedCount++;
       }
     }
     setOpenTradeSignals(openIds);
+    setAllTradesClosed(todayCount === 0 && closedCount > 0);
 
     try {
       const overdueOpen = await getOpenTrades(portfolio.id);
@@ -290,6 +296,12 @@ export default function Dashboard() {
     }
 
     if (signals && !signalsWaitUntil) {
+      if (allTradesClosed) {
+        return {
+          now: { label: "Fertig für heute" },
+          next: { label: "Neue Analyse", time: tomorrowLabel },
+        };
+      }
       const hasVisibleSignal =
         (signals.steady.confidence >= 70 || openTradeSignals.has(signals.steady.id)) ||
         (signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id));
