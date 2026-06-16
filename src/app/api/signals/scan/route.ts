@@ -43,9 +43,11 @@ export async function GET() {
 
     return NextResponse.json({ candidates });
   } catch (err) {
-    console.error("Scan fehlgeschlagen:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error("Scan fehlgeschlagen:", msg, stack);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unbekannter Fehler" },
+      { error: msg, stack: stack?.split("\n").slice(0, 5) },
       { status: 500 }
     );
   }
