@@ -254,7 +254,8 @@ export default function Dashboard() {
 
   const totalPnl = portfolio ? (portfolio.currentBalance + investedAmount - portfolio.budget) : 0;
 
-  function getStatusBar(): { now: { label: string; color: string }; next: { label: string; color: string } } | null {
+  interface StatusBlock { label: string; time?: string }
+  function getStatusBar(): { now: StatusBlock; next: StatusBlock } | null {
     if (!loaded || !portfolio) return null;
     if (activeTab !== "signals") return null;
 
@@ -265,26 +266,28 @@ export default function Dashboard() {
     const mins = h * 60 + m;
     const isWE = isWeekend();
     const day = cet.getDay();
+    const tomorrowLabel = isWE || day === 5 || day === 6 ? "Montag" : "Morgen";
 
     if (openTradeCount > 0) {
       if (mins >= 22 * 60) {
         return {
-          now: { label: "Trade offen", color: "action" },
-          next: { label: "Jetzt schließen", color: "action" },
+          now: { label: "Trade offen" },
+          next: { label: "Position schließen", time: "Jetzt" },
         };
       }
       const nextCheck30 = Math.ceil((mins + 1) / 30) * 30;
       const nextH = Math.floor(nextCheck30 / 60);
       const nextM = nextCheck30 % 60;
+      const nextTime = `${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`;
       if (mins >= 21 * 60 + 30) {
         return {
-          now: { label: "Trade läuft", color: "active" },
-          next: { label: "Schließen um 22:00", color: "action" },
+          now: { label: "Trade aktiv" },
+          next: { label: "Position schließen", time: "22:00" },
         };
       }
       return {
-        now: { label: "Trade läuft", color: "active" },
-        next: { label: `Nächster Check ${String(nextH).padStart(2, "0")}:${String(nextM).padStart(2, "0")}`, color: "grey" },
+        now: { label: "Trade aktiv" },
+        next: { label: "Nächste Prüfung", time: nextTime },
       };
     }
 
@@ -294,47 +297,46 @@ export default function Dashboard() {
         (signals.bold.confidence >= 50 || openTradeSignals.has(signals.bold.id));
       if (hasVisibleSignal) {
         return {
-          now: { label: "Signale verfügbar", color: "active" },
-          next: { label: "Trade öffnen", color: "action" },
+          now: { label: "Empfehlungen bereit" },
+          next: { label: "Trade eröffnen" },
         };
       }
       return {
-        now: { label: "Keine Signale heute", color: "grey" },
-        next: { label: isWE || day === 5 ? "Montag ab 09:15" : "Morgen ab 09:15", color: "grey" },
+        now: { label: "Keine Empfehlung heute" },
+        next: { label: "Neue Analyse", time: tomorrowLabel },
       };
     }
 
     if (signalsLoading) {
       return {
-        now: { label: "Signale werden erstellt…", color: "active" },
-        next: { label: "Trade öffnen", color: "grey" },
+        now: { label: "Analyse läuft…" },
+        next: { label: "Trade eröffnen" },
       };
     }
 
     if (signalsWaitUntil) {
       if (scanCandidates && scanCandidates.length > 0) {
         return {
-          now: { label: "Scan abgeschlossen", color: "active" },
-          next: { label: `Signale um ${signalsWaitUntil}`, color: "grey" },
+          now: { label: "Markt-Check fertig" },
+          next: { label: "Finale Analyse", time: signalsWaitUntil },
         };
       }
       if (mins >= 9 * 60 + 15) {
         return {
-          now: { label: "Märkte laufen an", color: "grey" },
-          next: { label: `Signale um ${signalsWaitUntil}`, color: "grey" },
+          now: { label: "Märkte laufen an" },
+          next: { label: "Finale Analyse", time: signalsWaitUntil },
         };
       }
-      const nextLabel = isWE ? "Montag ab 09:15" : day === 6 ? "Montag ab 09:15" : "Scan um 09:15";
       return {
-        now: { label: "Wartet auf Börsenstart", color: "grey" },
-        next: { label: nextLabel, color: "grey" },
+        now: { label: "Börse geschlossen" },
+        next: { label: "Markt-Check", time: "09:15" },
       };
     }
 
     if (mins >= 22 * 60) {
       return {
-        now: { label: "Fertig für heute ✓", color: "grey" },
-        next: { label: isWE || day === 5 ? "Montag ab 09:15" : "Morgen ab 09:15", color: "grey" },
+        now: { label: "Fertig für heute" },
+        next: { label: "Neue Analyse", time: tomorrowLabel },
       };
     }
 
@@ -342,12 +344,6 @@ export default function Dashboard() {
   }
 
   const statusBar = getStatusBar();
-
-  const statusStyles: Record<string, { wrapper: string; text: string; dot: string }> = {
-    grey: { wrapper: "", text: "text-text-muted", dot: "bg-text-muted/40" },
-    active: { wrapper: "bg-text-primary rounded-[10px]", text: "text-white", dot: "bg-white animate-pulse" },
-    action: { wrapper: "bg-text-primary rounded-[10px]", text: "text-white", dot: "bg-amber-400 animate-pulse" },
-  };
 
   return (
     <>
@@ -473,29 +469,25 @@ export default function Dashboard() {
       {/* Status Bar */}
       {statusBar && (
         <div className="px-5 w-full max-w-lg mx-auto pt-2">
-          <div className="rounded-[12px] border border-border bg-bg-secondary overflow-hidden">
-            <div className="flex">
-              {/* JETZT */}
-              <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 ${statusStyles[statusBar.now.color].wrapper}`}>
-                <div className={`w-2 h-2 rounded-full shrink-0 ${statusStyles[statusBar.now.color].dot}`} />
-                <div className="min-w-0">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest ${statusBar.now.color === "grey" ? "text-text-muted/50" : "text-white/50"}`}>Jetzt</p>
-                  <p className={`text-sm font-bold truncate ${statusStyles[statusBar.now.color].text}`}>{statusBar.now.label}</p>
-                </div>
-              </div>
-              {/* Trennlinie */}
-              <div className="w-px bg-border self-stretch" />
-              {/* ALS NÄCHSTES */}
-              <div className={`flex-1 flex items-center gap-2.5 px-4 py-3 ${statusStyles[statusBar.next.color].wrapper}`}>
-                <svg className={`w-3.5 h-3.5 shrink-0 ${statusStyles[statusBar.next.color].text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
-                <div className="min-w-0">
-                  <p className={`text-[10px] font-bold uppercase tracking-widest ${statusBar.next.color === "grey" ? "text-text-muted/50" : "text-white/50"}`}>Nächster Schritt</p>
-                  <p className={`text-sm font-bold truncate ${statusStyles[statusBar.next.color].text}`}>{statusBar.next.label}</p>
-                </div>
+          <div className="rounded-[12px] overflow-hidden flex">
+            {/* AKTUELL — immer dunkel */}
+            <div className="flex-1 bg-text-primary px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-0.5">Aktuell</p>
+              <p className="text-sm font-bold text-white truncate">{statusBar.now.label}</p>
+            </div>
+            {/* NÄCHSTER SCHRITT — hell */}
+            <div className="flex-1 bg-bg-secondary border border-border border-l-0 rounded-r-[12px] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted/50 mb-0.5">Nächster Schritt</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-text-primary truncate">{statusBar.next.label}</p>
+                {statusBar.next.time && (
+                  <span className="shrink-0 text-[11px] font-bold text-text-primary bg-bg-elevated px-2 py-0.5 rounded-full border border-border">
+                    {statusBar.next.time}
+                  </span>
+                )}
               </div>
             </div>
+          </div>
           </div>
         </div>
       )}
