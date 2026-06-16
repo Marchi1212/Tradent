@@ -552,7 +552,7 @@ export async function generatePreAnalysis(): Promise<ScanCandidate[]> {
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1000,
+    max_tokens: 2000,
     system: SYSTEM_PROMPT_SCAN,
     messages: [{
       role: "user",
@@ -707,7 +707,7 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1500,
+    max_tokens: 2000,
     system: getSystemPrompt(dayType),
     messages: [
       {
