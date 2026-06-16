@@ -42,8 +42,7 @@ export async function getTodaySignals(): Promise<{
     .from("signals")
     .select("*")
     .eq("date", today)
-    .eq("session", "daily")
-    .gt("entry", 0);
+    .eq("session", "daily");
 
   if (error) throw error;
   if (!data || data.length < 2) return null;
@@ -65,8 +64,7 @@ export async function todaySignalsExist(): Promise<boolean> {
     .from("signals")
     .select("*", { count: "exact", head: true })
     .eq("date", today)
-    .eq("session", "daily")
-    .gt("entry", 0);
+    .eq("session", "daily");
 
   if (error) return false;
   return (count ?? 0) >= 2;
@@ -137,74 +135,55 @@ export async function saveTodaySignals(signals: {
   if (error) throw error;
 }
 
-// ── Scan-Kandidaten (Pre-Analysis) ──────────────────
+// ── Scan-Kandidaten (Pre-Analysis) via Supabase Storage ──────────────────
+
+const SCAN_BUCKET = "cache";
+const SCAN_PATH = "scan-candidates.json";
+
+async function ensureBucket(supabase: ReturnType<typeof createAdminClient>) {
+  const { data } = await supabase.storage.getBucket(SCAN_BUCKET);
+  if (!data) {
+    await supabase.storage.createBucket(SCAN_BUCKET, { public: false });
+  }
+}
 
 export async function saveScanCandidates(candidates: ScanCandidate[]): Promise<void> {
   const supabase = createAdminClient();
+  await ensureBucket(supabase);
   const today = new Date().toISOString().split("T")[0];
+  const payload = JSON.stringify({ date: today, candidates });
 
-  const rows = candidates.map((c, i) => ({
-    date: today,
-    session: "daily",
-    risk_class: i % 2 === 0 ? "steady" : "bold",
-    asset: c.asset,
-    ticker: c.ticker,
-    direction: c.direction,
-    leverage: "–",
-    entry: 0,
-    stop_loss: 0,
-    take_profit: 0,
-    confidence: c.confidence,
-    expected_gain_percent: 0,
-    risk_reward_ratio: "–",
-    reasoning: c.note,
-    market: c.market,
-    market_close_time: "",
-    optimal_entry: "",
-    category: c.category,
-  }));
+  const { error } = await supabase.storage
+    .from(SCAN_BUCKET)
+    .upload(SCAN_PATH, payload, {
+      contentType: "application/json",
+      upsert: true,
+    });
 
-  const { error } = await supabase.from("signals").insert(rows);
   if (error) throw error;
 }
 
 export async function getScanCandidates(): Promise<ScanCandidate[] | null> {
-  const supabase = await getServerClient();
-  const today = new Date().toISOString().split("T")[0];
-
-  const { data, error } = await supabase
-    .from("signals")
-    .select("*")
-    .eq("date", today)
-    .eq("session", "daily")
-    .eq("entry", 0)
-    .order("confidence", { ascending: false });
-
-  if (error) throw error;
-  if (!data || data.length === 0) return null;
-
-  return data.map((row: Record<string, unknown>) => ({
-    asset: row.asset as string,
-    ticker: row.ticker as string,
-    category: row.category as string,
-    market: row.market as string,
-    direction: row.direction as "LONG" | "SHORT",
-    confidence: Number(row.confidence),
-    note: row.reasoning as string,
-  }));
-}
-
-export async function scanCandidatesExist(): Promise<boolean> {
   const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const { count, error } = await supabase
-    .from("signals")
-    .select("*", { count: "exact", head: true })
-    .eq("date", today)
-    .eq("session", "daily")
-    .eq("entry", 0);
+  const { data, error } = await supabase.storage
+    .from(SCAN_BUCKET)
+    .download(SCAN_PATH);
 
-  if (error) return false;
-  return (count ?? 0) >= 2;
+  if (error || !data) return null;
+
+  try {
+    const text = await data.text();
+    const parsed = JSON.parse(text);
+    if (parsed.date !== today) return null;
+    return parsed.candidates as ScanCandidate[];
+  } catch {
+    return null;
+  }
+}
+
+export async function scanCandidatesExist(): Promise<boolean> {
+  const candidates = await getScanCandidates();
+  return candidates !== null && candidates.length >= 2;
 }
