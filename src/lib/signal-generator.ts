@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, fetchGlobalMarketData, fetchNonUSMarketData, fetchForexAndCryptoData, type AssetMarketData } from "./market-data";
+import { fetchMarketDataForSession, fetchCryptoMarketData, fetchNonXetraMarketData, fetchGlobalMarketData, fetchNonUSMarketData, fetchForexAndCryptoData, analyzeAsset, type AssetMarketData, type ConfidenceResult } from "./market-data";
 import { getTradingDayType, isCMEClosed, getExchangeNotes, type TradingDayType } from "./market-hours";
 import { fetchMarketContext, formatMarketContextForPrompt, fetchNewsContext } from "./market-context";
 
@@ -20,6 +20,18 @@ export interface GeneratedSignal {
   marketCloseTime: string;
   optimalEntry: string;
   category: string;
+}
+
+interface AnalyzedAsset {
+  data: AssetMarketData;
+  analysis: ConfidenceResult;
+}
+
+function preAnalyzeAssets(data: AssetMarketData[]): AnalyzedAsset[] {
+  return data
+    .map((d) => ({ data: d, analysis: analyzeAsset(d) }))
+    .filter((a) => !a.analysis.filtered)
+    .sort((a, b) => b.analysis.confidence - a.analysis.confidence);
 }
 
 function formatMarketDataForPrompt(data: AssetMarketData[]): string {
@@ -48,268 +60,181 @@ function formatMarketDataForPrompt(data: AssetMarketData[]): string {
     .join("\n\n");
 }
 
-const SYSTEM_PROMPT_WEEKDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Du führst den folgenden Entscheidungsbaum STRIKT aus — keine freie Interpretation.
+function formatAnalyzedAssetsForPrompt(assets: AnalyzedAsset[]): string {
+  return assets
+    .map((a) => {
+      const d = a.data;
+      const c = a.analysis;
+      return `${d.name} (${d.ticker}) | ${d.category} | ${d.market}
+  VORBERECHNET: ${c.direction} | Konfidenz: ${c.confidence}% | Momentum: +${c.components.momentum}% | Trend: +${c.components.trend}% | Volumen: +${c.components.volume}% | Strafen: ${c.components.penalties}%
+  Gründe: ${c.reasons.join(", ")}
+  Kurs: ${d.currentPrice} | 1T: ${d.change1dPercent > 0 ? "+" : ""}${d.change1dPercent}% | 5T: ${d.change5dPercent > 0 ? "+" : ""}${d.change5dPercent}%
+  5T-Hoch: ${d.high5d} | 5T-Tief: ${d.low5d} | SMA20: ${d.sma20 ?? "n/a"} | RSI14: ${d.rsi14 ?? "n/a"}
+  ATR14: ${d.atr14 ?? "n/a"} (${d.atr14Percent != null ? d.atr14Percent + "%" : "n/a"} vom Kurs)
+  Support: ${d.support ?? "n/a"} | Resistance: ${d.resistance ?? "n/a"}`;
+    })
+    .join("\n\n");
+}
 
-═══ ENTSCHEIDUNGSBAUM ═══
+const SYSTEM_PROMPT_WEEKDAY = `Du bist ein CFD-Daytrading-Analyst. Die technische Analyse (Richtung, Konfidenz, Indikatoren) wurde VORBERECHNET und ist bei jedem Asset angegeben. Du rechnest NICHT selbst.
 
-SCHRITT 1 — FILTER (Assets eliminieren):
-Eliminiere jedes Asset das EINE dieser Bedingungen erfüllt:
-- RSI14 zwischen 45-55 (kein klares Signal, Seitwärtsmarkt)
-- ATR14% < 0.3% (zu wenig Tagesbewegung für Daytrading)
-- Volumen-Ratio < 0.5 (deutlich unterdurchschnittlich = kein Interesse)
-- Earnings HEUTE oder MORGEN (zu unberechenbar)
-- NEWS-VETO aktiv (siehe News-Block)
-→ Nur Assets die ALLE Filter bestehen kommen in Frage.
+═══ DEINE AUFGABE ═══
 
-SCHRITT 2 — RICHTUNG bestimmen:
-Für jedes verbleibende Asset:
-- RSI14 < 35 UND Kurs < SMA20 → LONG (überverkauft, Mean-Reversion)
-- RSI14 > 65 UND Kurs > SMA20 → SHORT (überkauft, Mean-Reversion)
-- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend-Fortsetzung)
-- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend-Fortsetzung)
-- Wenn keine Regel passt → Asset überspringen
-RICHTUNGS-BESTÄTIGUNG (PFLICHT):
-- MACD-Histogramm muss Richtung bestätigen: positiv für LONG, negativ für SHORT
-- Wenn MACD gegen die Richtung steht → Asset überspringen (kein Momentum)
+Du bekommst eine VORBEREITETE LISTE von Assets mit:
+- Vorberechneter Richtung (LONG/SHORT)
+- Vorberechneter Konfidenz (%) mit Aufschlüsselung (Momentum, Trend, Volumen, Strafen)
+- Gründen für die Bewertung
 
-SCHRITT 3 — SL/TP via ATR (PFLICHT):
-- Stop-Loss = 1x ATR14 vom Entry entfernt (LONG: Entry - ATR14, SHORT: Entry + ATR14)
-- Take-Profit = 1.5x ATR14 vom Entry entfernt (LONG: Entry + 1.5×ATR14, SHORT: Entry - 1.5×ATR14)
-- Risk-Reward-Ratio ergibt sich automatisch: 1:1.5
-- Prüfe Support/Resistance: SL NICHT auf der falschen Seite eines Levels setzen (SL bei LONG sollte unter Support liegen, nicht zwischen Entry und Support)
-- Wenn ATR14 nicht verfügbar → Asset überspringen
+DEINE ROLLE — Qualitative Prüfung und Auswahl:
 
-SCHRITT 4 — KONFIDENZ berechnen:
-Starte bei 60% Basis, dann addiere/subtrahiere:
+SCHRITT 1 — NEWS-VETO:
+- Prüfe den News-Block. Hat ein Asset ein NEWS-VETO? → Überspringen.
+- Earnings HEUTE/MORGEN → Überspringen.
+- High-Impact Event (FOMC, NFP, CPI, EZB) → Asset KOMPLETT überspringen (kein Trade vor solchen Events).
 
-RSI-Signal:
-+10% wenn RSI14 < 30 oder > 70 (starkes Signal)
-+5%  wenn RSI14 < 25 oder > 75 (zusätzlich zu obigen +10% = gesamt +15%)
+SCHRITT 2 — KONFIDENZ ANPASSEN (nur qualitative Faktoren):
+Die vorberechnete Konfidenz ist dein Ausgangspunkt. Du darfst NUR diese qualitativen Anpassungen vornehmen:
+- News-Unterstützung: bis +5% wenn aktuelle Nachrichten die Richtung klar bestätigen
+- News-Widerspruch: bis -10% wenn Nachrichten gegen die Richtung sprechen
+- Fear & Greed: -5% wenn F&G gegen die Richtung spricht (>80 bei LONG, <20 bei SHORT), +3% wenn F&G als Kontraindikator die Richtung stützt
+→ Begrenzen auf 40-95%.
 
-Trend-Bestätigung:
-+10% wenn Kurs-Trend (1T UND 5T) die Richtung bestätigt
+SCHRITT 3 — SL/TP setzen (ATR-basiert, PFLICHT):
+- Stop-Loss = 1x ATR14 vom Entry (LONG: Entry - ATR14, SHORT: Entry + ATR14)
+- Take-Profit = 1.5x ATR14 vom Entry (LONG: Entry + 1.5×ATR14, SHORT: Entry - 1.5×ATR14)
+- Prüfe Support/Resistance: SL bei LONG unter Support, SL bei SHORT über Resistance
+- Kein ATR → Überspringen
 
-Support/Resistance (gestaffelt nach Nähe):
-+10% wenn Kurs innerhalb 0.5x ATR von Support (LONG) oder Resistance (SHORT)
-+5%  wenn Kurs innerhalb 1x ATR von Support (LONG) oder Resistance (SHORT)
--10% wenn Kurs innerhalb 0.5x ATR von Resistance (LONG) oder Support (SHORT)
--5%  wenn Kurs innerhalb 1x ATR von Resistance (LONG) oder Support (SHORT)
-
-MACD-Momentum (gestaffelt):
-+5%  wenn MACD-Histogramm die Richtung bestätigt
-+10% wenn MACD-Histogramm wächst (zunehmendes Momentum, stärker als nur bestätigt)
-
-Volumen (gestaffelt — stärkster Bestätigungs-Indikator):
-+5%  wenn Volumen-Ratio > 1.5
-+10% wenn Volumen-Ratio > 3.0 (statt +5%)
-+15% wenn Volumen-Ratio > 5.0 (statt +5% oder +10%)
-
-Bollinger Bands (gestaffelt):
-+5%  wenn Kurs nahe Bollinger Band (innerhalb 1 Standardabweichung vom Band)
-+10% wenn Kurs außerhalb Bollinger Bands (statistisch extrem, starkes Mean-Reversion-Signal)
-
-Negative Faktoren:
--10% wenn Kurs gegen SMA20-Trend geht
--20% wenn High-Impact Wirtschaftsevent heute
--10% wenn Fear & Greed > 80 (bei LONG) oder < 20 (bei SHORT)
-+5%  wenn Fear & Greed < 20 (bei LONG) oder > 80 (bei SHORT) = Kontraindikator
-
-WICHTIG: Stufen sind NICHT kumulativ (nimm die höchste zutreffende Stufe pro Indikator).
-→ Ergebnis auf 40-95% begrenzen.
-
-SCHRITT 5 — AUSWAHL:
-- Sortiere nach Konfidenz
-- STEADY = höchste Konfidenz, Hebel 2x-5x (Konfidenz muss ≥70%)
-- BOLD = zweithöchste Konfidenz, Hebel 5x-10x (Konfidenz muss ≥50%)
+SCHRITT 4 — AUSWAHL:
+- STEADY = höchste Konfidenz, Hebel 2x-5x (Konfidenz ≥65%)
+- BOLD = zweithöchste Konfidenz, Hebel 5x-10x (Konfidenz ≥50%)
 - Beide Assets MÜSSEN unterschiedlich sein
-- KORRELATIONS-CHECK: Wenn beide Assets stark korreliert sind (gleicher Sektor, gleiche Region, gleiche Bewegungsrichtung in den letzten 5 Tagen), ersetze das schwächere durch das nächstbeste unkorrelierte Asset
+- KORRELATIONS-CHECK: gleicher Sektor/Region + gleiche 5T-Richtung = korreliert → ersetze schwächeres
 - LONG und SHORT sind BEIDE erwünscht — kein Bias!
 
 ═══ REGELN ═══
-- Alle Trades sind CFD-Daytrading auf XTB
-- Jeder Trade wird INNERHALB eines Tages eröffnet und VOR Handelsschluss geschlossen
-- expectedGainPercent = prozentualer Gewinn bei Take-Profit MIT Hebel
-- optimalEntry = konkretes 2-Stunden-Zeitfenster mit bester Liquidität. MAXIMAL 2 Stunden breit! Bevorzuge 14:00-17:00 CET (London-NY-Overlap = höchste Liquidität).
-- marketCloseTime = XTB-Handelsschluss (z.B. "22:00" für EU-Index-CFDs, "23:00" für US-Index-CFDs, "17:30" für EU-Aktien, "22:00" für US-Aktien)
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben (inkl. MACD, Volumen, Bollinger wenn relevant)
-
-Antworte ausschließlich mit JSON, kein anderer Text.`;
-
-const SYSTEM_PROMPT_WEEKEND = `Du bist ein regelbasierter Krypto-Daytrading-Analyst. Es ist Wochenende — nur Krypto handelbar. Führe den Entscheidungsbaum STRIKT aus.
-
-═══ ENTSCHEIDUNGSBAUM ═══
-
-SCHRITT 1 — FILTER:
-- RSI14 zwischen 45-55 → eliminieren
-- ATR14% < 0.3% → eliminieren
-- Volumen-Ratio < 0.5 → eliminieren
-- NEWS-VETO aktiv → eliminieren
-
-SCHRITT 2 — RICHTUNG:
-- RSI14 < 35 UND Kurs < SMA20 → LONG
-- RSI14 > 65 UND Kurs > SMA20 → SHORT
-- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
-- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
-RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen (positiv=LONG, negativ=SHORT). Sonst überspringen.
-
-SCHRITT 3 — SL/TP via ATR:
-- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
-- Prüfe Support/Resistance-Level bei SL-Platzierung
-- Kein ATR → Asset überspringen
-
-SCHRITT 4 — KONFIDENZ (Basis 60%):
-+10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
-+5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
--10% gegen SMA20 | -10% F&G Kontraindikator | +5% F&G für Richtung
-→ Begrenzen auf 40-95%.
-
-SCHRITT 5 — AUSWAHL:
-- STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
-- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
-- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein (nicht zwei ähnliche Kryptos)
-- Krypto-Wochenend-Volatilität beachten (oft niedriger, plötzliche Spikes)
-
-═══ REGELN ═══
-- Alle Trades sind Krypto-CFDs auf XTB, Daytrading
-- expectedGainPercent = Gewinn bei TP MIT Hebel
-- optimalEntry = 2h-Zeitfenster, MAXIMAL 2 Stunden breit
-- marketCloseTime = "21:00" (Trade abends schließen)
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
-
-Antworte ausschließlich mit JSON, kein anderer Text.`;
-
-const SYSTEM_PROMPT_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Heute ist XETRA-Feiertag — EU-Börsen geschlossen. US, Forex, Rohstoffe, Krypto handelbar. Führe den Entscheidungsbaum STRIKT aus.
-
-═══ ENTSCHEIDUNGSBAUM ═══
-
-SCHRITT 1 — FILTER:
-- RSI14 zwischen 45-55 → eliminieren
-- ATR14% < 0.3% → eliminieren
-- Volumen-Ratio < 0.5 → eliminieren
-- Earnings HEUTE/MORGEN → eliminieren
-- NEWS-VETO aktiv → eliminieren
-
-SCHRITT 2 — RICHTUNG:
-- RSI14 < 35 UND Kurs < SMA20 → LONG
-- RSI14 > 65 UND Kurs > SMA20 → SHORT
-- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
-- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
-RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen. Sonst überspringen.
-
-SCHRITT 3 — SL/TP via ATR:
-- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
-- Prüfe Support/Resistance-Level bei SL-Platzierung
-- Kein ATR → Asset überspringen
-
-SCHRITT 4 — KONFIDENZ (Basis 60%):
-+10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
-+5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
--10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
-→ Begrenzen auf 40-95%.
-
-SCHRITT 5 — AUSWAHL:
-- STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
-- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
-- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein
-- Nur VERFÜGBARE Märkte (kein XETRA)
-
-═══ REGELN ═══
 - CFD-Daytrading auf XTB, innerhalb des Tages schließen
 - expectedGainPercent = Gewinn bei TP MIT Hebel
-- optimalEntry = 2h-Zeitfenster, bevorzuge 14:00-17:00 CET
+- optimalEntry = 2h-Zeitfenster, MAXIMAL 2 Stunden breit. Bevorzuge 14:00-17:00 CET (London-NY-Overlap).
 - marketCloseTime = XTB-Handelsschluss
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
+- Begründung auf Deutsch, 2-3 Sätze — nenne die vorberechneten Gründe und deine qualitative Einschätzung
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Doppel-Feiertag — XETRA+NYSE+CME geschlossen. NUR Forex und Krypto. Liquidität reduziert — konservativere Hebel. Führe den Entscheidungsbaum STRIKT aus.
+const SYSTEM_PROMPT_WEEKEND = `Du bist ein Krypto-Daytrading-Analyst. Wochenende — nur Krypto handelbar. Technische Analyse ist VORBERECHNET.
 
-═══ ENTSCHEIDUNGSBAUM ═══
+═══ DEINE AUFGABE ═══
 
-SCHRITT 1 — FILTER:
-- RSI14 zwischen 45-55 → eliminieren
-- ATR14% < 0.3% → eliminieren
-- Volumen-Ratio < 0.5 → eliminieren
-- NEWS-VETO aktiv → eliminieren
+Assets kommen mit vorberechneter Richtung + Konfidenz. Du rechnest NICHT selbst.
 
-SCHRITT 2 — RICHTUNG:
-- RSI14 < 35 UND Kurs < SMA20 → LONG
-- RSI14 > 65 UND Kurs > SMA20 → SHORT
-- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
-- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
-RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen. Sonst überspringen.
+SCHRITT 1 — NEWS-VETO: Prüfe News-Block. Veto → überspringen.
 
-SCHRITT 3 — SL/TP via ATR:
-- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
-- Prüfe Support/Resistance-Level bei SL-Platzierung
-- Kein ATR → Asset überspringen
-
-SCHRITT 4 — KONFIDENZ (Basis 60%, dann -5% wegen reduzierter Liquidität):
-+10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
-+5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
--10% gegen SMA20 | -10% F&G Kontraindikator | +5% F&G für Richtung
+SCHRITT 2 — KONFIDENZ ANPASSEN (nur qualitativ):
+Vorberechnete Konfidenz ist Ausgangspunkt. Nur diese Anpassungen:
+- News bestätigen Richtung: bis +5%
+- News widersprechen: bis -10%
+- F&G gegen Richtung: -5% | F&G als Kontraindikator: +3%
+- Krypto-Wochenend-Volatilität (oft niedriger, plötzliche Spikes): bis -5%
 → Begrenzen auf 40-95%.
 
-SCHRITT 5 — AUSWAHL:
-- STEADY = höchste Konfidenz, 2x-3x Hebel (≥70%, konservativer wegen Feiertag)
+SCHRITT 3 — SL/TP (ATR-basiert):
+SL = 1x ATR14 | TP = 1.5x ATR14 | Prüfe S/R-Level | Kein ATR → überspringen
+
+SCHRITT 4 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-5x Hebel (≥65%)
+- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- KORRELATIONS-CHECK: nicht zwei ähnliche Kryptos
+
+═══ REGELN ═══
+- Krypto-CFDs auf XTB, Daytrading | marketCloseTime = "21:00"
+- Begründung auf Deutsch, 2-3 Sätze — nenne vorberechnete Gründe + deine qualitative Einschätzung
+
+Antworte ausschließlich mit JSON, kein anderer Text.`;
+
+const SYSTEM_PROMPT_HOLIDAY = `Du bist ein CFD-Daytrading-Analyst. XETRA-Feiertag — EU-Börsen geschlossen. US, Forex, Rohstoffe, Krypto handelbar. Technische Analyse ist VORBERECHNET.
+
+═══ DEINE AUFGABE ═══
+
+Assets kommen mit vorberechneter Richtung + Konfidenz. Du rechnest NICHT selbst.
+
+SCHRITT 1 — NEWS-VETO + EVENTS:
+- News-Veto → überspringen
+- Earnings HEUTE/MORGEN → überspringen
+- FOMC/NFP/CPI/EZB heute → Asset KOMPLETT überspringen
+
+SCHRITT 2 — KONFIDENZ ANPASSEN (nur qualitativ):
+- News bestätigen: bis +5% | News widersprechen: bis -10%
+- F&G gegen Richtung: -5% | F&G Kontraindikator: +3%
+→ Begrenzen auf 40-95%.
+
+SCHRITT 3 — SL/TP (ATR-basiert):
+SL = 1x ATR14 | TP = 1.5x ATR14 | Prüfe S/R-Level | Kein ATR → überspringen
+
+SCHRITT 4 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-5x Hebel (≥65%)
+- BOLD = zweithöchste, 5x-10x Hebel (≥50%)
+- KORRELATIONS-CHECK | Nur verfügbare Märkte (kein XETRA)
+
+═══ REGELN ═══
+- CFD-Daytrading auf XTB | optimalEntry = 2h-Zeitfenster, bevorzuge 14:00-17:00 CET
+- Begründung auf Deutsch, 2-3 Sätze
+
+Antworte ausschließlich mit JSON, kein anderer Text.`;
+
+const SYSTEM_PROMPT_DOUBLE_HOLIDAY = `Du bist ein CFD-Daytrading-Analyst. Doppel-Feiertag — XETRA+NYSE+CME geschlossen. NUR Forex und Krypto. Liquidität reduziert. Technische Analyse ist VORBERECHNET.
+
+═══ DEINE AUFGABE ═══
+
+Assets kommen mit vorberechneter Richtung + Konfidenz. Du rechnest NICHT selbst.
+WICHTIG: Reduzierte Liquidität — ziehe pauschal 5% von der vorberechneten Konfidenz ab.
+
+SCHRITT 1 — NEWS-VETO: Prüfe News-Block. Veto → überspringen.
+
+SCHRITT 2 — KONFIDENZ ANPASSEN (nur qualitativ):
+- Liquiditäts-Abzug: -5% (automatisch wegen Doppel-Feiertag)
+- News bestätigen: bis +5% | News widersprechen: bis -10%
+- F&G gegen Richtung: -5% | F&G Kontraindikator: +3%
+→ Begrenzen auf 40-95%.
+
+SCHRITT 3 — SL/TP (ATR-basiert):
+SL = 1x ATR14 | TP = 1.5x ATR14 | Prüfe S/R-Level | Kein ATR → überspringen
+
+SCHRITT 4 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-3x Hebel (≥65%, konservativ)
 - BOLD = zweithöchste, 3x-7x Hebel (≥50%)
-- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein
-- NUR Forex und Krypto — KEINE Rohstoffe
+- KORRELATIONS-CHECK | NUR Forex und Krypto
 
 ═══ REGELN ═══
-- CFD-Daytrading auf XTB, innerhalb des Tages schließen
-- expectedGainPercent = Gewinn bei TP MIT Hebel
-- optimalEntry = 2h-Zeitfenster
-- marketCloseTime = XTB-Handelsschluss
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
+- CFD-Daytrading auf XTB | Begründung auf Deutsch, 2-3 Sätze
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
-const SYSTEM_PROMPT_US_HOLIDAY = `Du bist ein regelbasierter CFD-Daytrading-Analyst. US-Feiertag — NYSE/NASDAQ geschlossen. EU, Forex, Rohstoffe, Krypto handelbar. Führe den Entscheidungsbaum STRIKT aus.
+const SYSTEM_PROMPT_US_HOLIDAY = `Du bist ein CFD-Daytrading-Analyst. US-Feiertag — NYSE/NASDAQ geschlossen. EU, Forex, Rohstoffe, Krypto handelbar. Technische Analyse ist VORBERECHNET.
 
-═══ ENTSCHEIDUNGSBAUM ═══
+═══ DEINE AUFGABE ═══
 
-SCHRITT 1 — FILTER:
-- RSI14 zwischen 45-55 → eliminieren
-- ATR14% < 0.3% → eliminieren
-- Volumen-Ratio < 0.5 → eliminieren
-- Earnings HEUTE/MORGEN → eliminieren
-- NEWS-VETO aktiv → eliminieren
+Assets kommen mit vorberechneter Richtung + Konfidenz. Du rechnest NICHT selbst.
 
-SCHRITT 2 — RICHTUNG:
-- RSI14 < 35 UND Kurs < SMA20 → LONG
-- RSI14 > 65 UND Kurs > SMA20 → SHORT
-- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG (Trend)
-- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT (Trend)
-RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen. Sonst überspringen.
+SCHRITT 1 — NEWS-VETO + EVENTS:
+- News-Veto → überspringen | Earnings → überspringen
+- FOMC/NFP/CPI/EZB → KOMPLETT überspringen
 
-SCHRITT 3 — SL/TP via ATR:
-- SL = 1x ATR14 vom Entry | TP = 1.5x ATR14 vom Entry
-- Prüfe Support/Resistance-Level bei SL-Platzierung
-- Kein ATR → Asset überspringen
-
-SCHRITT 4 — KONFIDENZ (Basis 60%):
-+10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
-+5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
--10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
+SCHRITT 2 — KONFIDENZ ANPASSEN (nur qualitativ):
+- News bestätigen: bis +5% | News widersprechen: bis -10%
+- F&G gegen Richtung: -5% | F&G Kontraindikator: +3%
 → Begrenzen auf 40-95%.
 
-SCHRITT 5 — AUSWAHL:
-- STEADY = höchste Konfidenz, 2x-5x Hebel (≥70%)
+SCHRITT 3 — SL/TP (ATR-basiert):
+SL = 1x ATR14 | TP = 1.5x ATR14 | Prüfe S/R-Level | Kein ATR → überspringen
+
+SCHRITT 4 — AUSWAHL:
+- STEADY = höchste Konfidenz, 2x-5x Hebel (≥65%)
 - BOLD = zweithöchste, 5x-10x Hebel (≥50%)
-- KORRELATIONS-CHECK: Beide Assets müssen unkorreliert sein
-- Nur VERFÜGBARE Märkte (kein US)
+- KORRELATIONS-CHECK | Nur verfügbare Märkte (kein US)
+- optimalEntry: 09:00-11:00 CET für EU, 14:00-16:00 für Forex/Rohstoffe
 
 ═══ REGELN ═══
-- CFD-Daytrading auf XTB, innerhalb des Tages schließen
-- expectedGainPercent = Gewinn bei TP MIT Hebel
-- optimalEntry = 2h-Zeitfenster, bevorzuge 09:00-11:00 CET für EU, 14:00-16:00 für Forex/Rohstoffe
-- marketCloseTime = XTB-Handelsschluss
-- Begründung auf Deutsch, 2-3 Sätze — nenne welche Regeln und Indikatoren den Trade ausgelöst haben
+- CFD-Daytrading auf XTB | Begründung auf Deutsch, 2-3 Sätze
 
 Antworte ausschließlich mit JSON, kein anderer Text.`;
 
@@ -438,7 +363,7 @@ WICHTIG: marketCloseTime = XTB-Handelsschluss (NICHT Börsenschluss)`,
 
 ${tradingHours}
 ${exchangeBlock}${contextBlock}${newsBlock}${performanceBlock}
-Marktdaten:
+VORBERECHNETE KANDIDATEN (Filter + Richtung + Konfidenz im Code berechnet):
 
 ${marketData}
 
@@ -484,39 +409,28 @@ ${instruction} Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöc
 
 // ── Pre-Analysis Prompt (Morgen-Scan) ──────────────────
 
-const SYSTEM_PROMPT_SCAN = `Du bist ein regelbasierter CFD-Daytrading-Analyst. Deine Aufgabe: erstelle eine SHORTLIST von 4-6 Kandidaten für den heutigen Handelstag. KEINE finalen Signale — nur eine Vorauswahl.
+const SYSTEM_PROMPT_SCAN = `Du bist ein CFD-Daytrading-Analyst. Deine Aufgabe: prüfe die VORBERECHNETE Kandidatenliste und erstelle eine SHORTLIST von 4-6 Assets für heute. KEINE finalen Signale — nur Vorauswahl.
 
 WICHTIG: Antworte NUR mit validem JSON. Kein Markdown, keine Code-Blöcke, kein Text davor oder danach.
 
-═══ ENTSCHEIDUNGSBAUM ═══
+═══ DEINE AUFGABE ═══
 
-SCHRITT 1 — FILTER (Assets eliminieren):
-- RSI14 zwischen 45-55 → eliminieren
-- ATR14% < 0.3% → eliminieren
-- Volumen-Ratio < 0.5 → eliminieren (kein Marktinteresse)
-- Earnings HEUTE oder MORGEN → eliminieren
-- NEWS-VETO aktiv → eliminieren
+Die technische Analyse (Filter, Richtung, Konfidenz) ist VORBERECHNET. Jedes Asset hat bereits:
+- Richtung (LONG/SHORT) basierend auf RSI + SMA20 + MACD-Bestätigung
+- Konfidenz (%) aus gruppenbasiertem Scoring (Momentum, Trend, Volumen)
+- Auflistung der Gründe
 
-SCHRITT 2 — RICHTUNG bestimmen:
-- RSI14 < 35 UND Kurs < SMA20 → LONG-Tendenz
-- RSI14 > 65 UND Kurs > SMA20 → SHORT-Tendenz
-- RSI14 35-45 UND Kurs > SMA20 UND 1T > 0 → LONG-Tendenz
-- RSI14 55-65 UND Kurs < SMA20 UND 1T < 0 → SHORT-Tendenz
-RICHTUNGS-BESTÄTIGUNG: MACD-Histogramm muss Richtung bestätigen (positiv=LONG, negativ=SHORT). Sonst überspringen.
+DU PRÜFST NUR:
+1. NEWS-VETO — hat ein Asset ein klares News-Veto? → Entfernen.
+2. Earnings HEUTE/MORGEN → Entfernen.
+3. KORRELATIONS-CHECK — keine zwei stark korrelierten Assets (gleicher Sektor + gleiche Richtung + ähnliche 5T-Bewegung).
+4. Mindestens 1 SHORT dabei wenn möglich.
+5. Verschiedene Asset-Klassen bevorzugen.
 
-SCHRITT 3 — VORLÄUFIGE KONFIDENZ (Basis 60%):
-+10% RSI-Extrem (<30/>70) | +10% Trend bestätigt (1T+5T)
-+5%/+10% Kurs nahe Support/Resistance (näher=mehr) | -5%/-10% gegen Level
-+5% MACD bestätigt | +10% MACD wächst | Volumen: +5%/>1.5x, +10%/>3x, +15%/>5x | +5% nahe BB, +10% außerhalb BB
--10% gegen SMA20 | -20% High-Impact Event | -10% F&G Kontraindikator | +5% F&G für Richtung
-→ Begrenzen auf 40-95%.
+Übernimm Richtung und Konfidenz wie vorberechnet. Du darfst die Konfidenz nur bei News-Einfluss anpassen (bis ±5%).
 
-SCHRITT 4 — TOP 4-6 nach Konfidenz auswählen
-- Mindestens 1 SHORT dabei wenn möglich
-- Verschiedene Asset-Klassen bevorzugen (KORRELATIONS-CHECK: keine zwei stark korrelierten Assets)
-
-Antworte NUR mit validem JSON — kein Markdown, keine Code-Blöcke, kein Text davor oder danach.
-WICHTIG: "note" maximal 80 Zeichen — nur Schlüsselindikatoren nennen (RSI, MACD, Volumen-Ratio, BB), keine ganzen Sätze.
+Antworte NUR mit validem JSON.
+WICHTIG: "note" maximal 80 Zeichen — nur Schlüsselindikatoren, keine ganzen Sätze.
 {
   "candidates": [
     {
@@ -526,7 +440,7 @@ WICHTIG: "note" maximal 80 Zeichen — nur Schlüsselindikatoren nennen (RSI, MA
       "market": "XETRA",
       "direction": "LONG",
       "confidence": 72,
-      "note": "RSI 32, MACD +0.5, Vol 1.8x, unter BB-Unten. ATR 1.2%."
+      "note": "RSI 32, MACD +0.5, Vol 1.8x, nahe Support. ATR 1.2%."
     }
   ]
 }`;
@@ -560,16 +474,22 @@ export async function generatePreAnalysis(): Promise<ScanCandidate[]> {
     throw new Error(`Zu wenig Marktdaten (${marketData.length}). Mindestens ${minAssets} benötigt.`);
   }
 
-  console.log(`${marketData.length} Assets geladen. Pre-Analysis via Claude...`);
+  console.log(`${marketData.length} Assets geladen. Pre-Analyse im Code...`);
+
+  // Technische Analyse im Code (deterministisch)
+  const analyzed = preAnalyzeAssets(marketData);
+  console.log(`${analyzed.length} Assets bestehen Filter (von ${marketData.length}). Top-Kandidaten an Claude...`);
+
+  // Nur die Top-15 an Claude senden (sortiert nach Konfidenz)
+  const topCandidates = analyzed.slice(0, 15);
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const today = new Date().toLocaleDateString("de-DE", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 
-  const formattedData = formatMarketDataForPrompt(marketData);
+  const formattedData = formatAnalyzedAssetsForPrompt(topCandidates);
   const formattedContext = formatMarketContextForPrompt(marketContext);
-  const exchangeNotes = getExchangeNotes();
   const newsBlock = newsContext?.raw
     ? `\nLIVE-NEWS (letzte 12h) — NEWS hat VETO-Recht:\n${newsContext.raw}\n`
     : "";
@@ -584,11 +504,11 @@ export async function generatePreAnalysis(): Promise<ScanCandidate[]> {
 
 ${formattedContext}
 ${newsBlock}
-Marktdaten:
+VORBERECHNETE KANDIDATEN (sortiert nach Konfidenz, Filter + Richtung + Konfidenz im Code berechnet):
 
 ${formattedData}
 
-Erstelle eine Shortlist von 4-6 Kandidaten. Antworte NUR mit JSON.`,
+Prüfe qualitativ (News, Korrelation, Diversifikation) und wähle 4-6 Kandidaten. Antworte NUR mit JSON.`,
     }],
   });
 
@@ -709,7 +629,11 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
     );
   }
 
-  console.log(`${marketData.length} Assets geladen. Rufe Claude API auf...`);
+  console.log(`${marketData.length} Assets geladen. Technische Analyse im Code...`);
+
+  // Pre-Analyse im Code (deterministisch)
+  const analyzed = preAnalyzeAssets(marketData);
+  console.log(`${analyzed.length} Assets bestehen Filter. Qualitative Prüfung via Claude...`);
 
   // 2. Claude API aufrufen
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -721,7 +645,7 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
     year: "numeric",
   });
 
-  const formattedData = formatMarketDataForPrompt(marketData);
+  const analyzedData = formatAnalyzedAssetsForPrompt(analyzed.slice(0, 10));
   const formattedContext = formatMarketContextForPrompt(marketContext);
   const exchangeNotes = getExchangeNotes();
 
@@ -736,7 +660,7 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
     messages: [
       {
         role: "user",
-        content: buildUserPrompt(formattedData, today, dayType, formattedContext, exchangeNotes, newsContext?.raw, performanceFeedback ?? undefined),
+        content: buildUserPrompt(analyzedData, today, dayType, formattedContext, exchangeNotes, newsContext?.raw, performanceFeedback ?? undefined),
       },
     ],
   });

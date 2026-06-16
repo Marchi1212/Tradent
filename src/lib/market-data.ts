@@ -134,6 +134,212 @@ export interface AssetMarketData {
   resistance: number | null;
 }
 
+export type SignalDirection = "LONG" | "SHORT" | null;
+
+export interface ConfidenceResult {
+  direction: SignalDirection;
+  confidence: number;
+  components: {
+    momentum: number;
+    trend: number;
+    volume: number;
+    penalties: number;
+  };
+  reasons: string[];
+  filtered: boolean;
+  filterReason?: string;
+}
+
+export function analyzeAsset(d: AssetMarketData): ConfidenceResult {
+  const reasons: string[] = [];
+
+  // ── FILTER ──
+  if (d.rsi14 !== null && d.rsi14 >= 45 && d.rsi14 <= 55) {
+    return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "RSI 45-55 (kein Signal)" };
+  }
+  if (d.atr14Percent !== null && d.atr14Percent < 0.2 && (d.category === "Index")) {
+    return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "ATR zu niedrig für Index" };
+  }
+  if (d.atr14Percent !== null && d.atr14Percent < 0.5 && (d.category === "Rohstoff" || d.category === "Aktie")) {
+    return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "ATR zu niedrig" };
+  }
+  if (d.atr14Percent !== null && d.atr14Percent < 0.3 && d.category !== "Index") {
+    return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "ATR < 0.3%" };
+  }
+  if (d.volume && d.volume.ratio < 0.5) {
+    return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "Volumen < 0.5x (kein Interesse)" };
+  }
+
+  // ── RICHTUNG ──
+  let direction: SignalDirection = null;
+
+  const belowSMA = d.sma20 !== null && d.currentPrice < d.sma20;
+  const aboveSMA = d.sma20 !== null && d.currentPrice > d.sma20;
+  const trendUp1d = d.change1dPercent > 0;
+  const trendDown1d = d.change1dPercent < 0;
+
+  if (d.rsi14 !== null) {
+    if (d.rsi14 < 35 && belowSMA) direction = "LONG";
+    else if (d.rsi14 > 65 && aboveSMA) direction = "SHORT";
+    else if (d.rsi14 >= 35 && d.rsi14 < 45 && aboveSMA && trendUp1d) direction = "LONG";
+    else if (d.rsi14 > 55 && d.rsi14 <= 65 && belowSMA && trendDown1d) direction = "SHORT";
+  }
+
+  if (direction === null) {
+    return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "Keine klare Richtung" };
+  }
+
+  // MACD muss Richtung bestätigen
+  if (d.macd) {
+    const macdConfirms = (direction === "LONG" && d.macd.histogram > 0) || (direction === "SHORT" && d.macd.histogram < 0);
+    if (!macdConfirms) {
+      return { direction: null, confidence: 0, components: { momentum: 0, trend: 0, volume: 0, penalties: 0 }, reasons: [], filtered: true, filterReason: "MACD bestätigt Richtung nicht" };
+    }
+  }
+
+  // ── KONFIDENZ (Basis 45%, gruppenbasiert mit Caps) ──
+  let momentum = 0; // Cap: +20%
+  let trend = 0;    // Cap: +15%
+  let volume = 0;   // Cap: +10%
+  let penalties = 0;
+
+  // --- MOMENTUM-GRUPPE (RSI + MACD + Bollinger) — max +20% ---
+
+  // RSI
+  if (d.rsi14 !== null) {
+    if (d.rsi14 < 25 || d.rsi14 > 75) { momentum += 12; reasons.push(`RSI ${d.rsi14} extrem`); }
+    else if (d.rsi14 < 30 || d.rsi14 > 70) { momentum += 8; reasons.push(`RSI ${d.rsi14} stark`); }
+    else { momentum += 3; reasons.push(`RSI ${d.rsi14}`); }
+  }
+
+  // MACD (schon bestätigt, jetzt Stärke)
+  if (d.macd) {
+    const histAbs = Math.abs(d.macd.histogram);
+    const signalAbs = Math.abs(d.macd.signal);
+    const growing = histAbs > signalAbs * 0.5;
+    if (growing) { momentum += 6; reasons.push("MACD wächst"); }
+    else { momentum += 3; reasons.push("MACD bestätigt"); }
+  }
+
+  // Bollinger
+  if (d.bollingerBands) {
+    const price = d.currentPrice;
+    const { upper, lower } = d.bollingerBands;
+    const outsideBand = price > upper || price < lower;
+    const nearBand = (direction === "LONG" && price < lower * 1.02) || (direction === "SHORT" && price > upper * 0.98);
+
+    if (outsideBand) {
+      // Außerhalb Band: nur gut für Mean-Reversion, nicht für Trend-Fortsetzung
+      const isMeanReversion = (direction === "LONG" && price < lower) || (direction === "SHORT" && price > upper);
+      if (isMeanReversion) { momentum += 5; reasons.push("Außerhalb BB (Mean-Reversion)"); }
+      else { penalties -= 5; reasons.push("Außerhalb BB gegen Richtung"); }
+    } else if (nearBand) {
+      momentum += 3; reasons.push("Nahe BB");
+    }
+  }
+
+  // RSI-Extrem OHNE Volumen = Falle (Interaktionsregel)
+  if (d.rsi14 !== null && (d.rsi14 < 30 || d.rsi14 > 70) && d.volume && d.volume.ratio < 1.0) {
+    penalties -= 8;
+    reasons.push("RSI-Extrem ohne Volumen (Falle-Risiko)");
+  }
+
+  momentum = Math.min(momentum, 20);
+
+  // --- TREND-GRUPPE (SMA20 + Trend 1T/5T + S/R + 5T-Hoch/Tief) — max +15% ---
+
+  // Trend-Bestätigung
+  const trendConfirms = (direction === "LONG" && d.change1dPercent > 0 && d.change5dPercent > 0)
+    || (direction === "SHORT" && d.change1dPercent < 0 && d.change5dPercent < 0);
+  if (trendConfirms) { trend += 6; reasons.push("1T+5T Trend bestätigt"); }
+
+  // SMA20-Alignment
+  const smaAligned = (direction === "LONG" && belowSMA) || (direction === "SHORT" && aboveSMA);
+  if (smaAligned) { trend += 3; reasons.push("SMA20 bestätigt"); }
+
+  // Support/Resistance (nach ATR-Nähe gestaffelt)
+  if (d.atr14 && d.atr14 > 0) {
+    if (direction === "LONG" && d.support !== null) {
+      const distToSupport = Math.abs(d.currentPrice - d.support) / d.atr14;
+      if (distToSupport < 0.5) { trend += 6; reasons.push(`Sehr nahe Support (${distToSupport.toFixed(1)}x ATR)`); }
+      else if (distToSupport < 1.0) { trend += 3; reasons.push(`Nahe Support (${distToSupport.toFixed(1)}x ATR)`); }
+    }
+    if (direction === "SHORT" && d.resistance !== null) {
+      const distToResistance = Math.abs(d.resistance - d.currentPrice) / d.atr14;
+      if (distToResistance < 0.5) { trend += 6; reasons.push(`Sehr nahe Resistance (${distToResistance.toFixed(1)}x ATR)`); }
+      else if (distToResistance < 1.0) { trend += 3; reasons.push(`Nahe Resistance (${distToResistance.toFixed(1)}x ATR)`); }
+    }
+    // Gegen Level = Strafe
+    if (direction === "LONG" && d.resistance !== null) {
+      const distToResistance = Math.abs(d.resistance - d.currentPrice) / d.atr14;
+      if (distToResistance < 0.5) { penalties -= 6; reasons.push("LONG direkt unter Resistance"); }
+    }
+    if (direction === "SHORT" && d.support !== null) {
+      const distToSupport = Math.abs(d.currentPrice - d.support) / d.atr14;
+      if (distToSupport < 0.5) { penalties -= 6; reasons.push("SHORT direkt über Support"); }
+    }
+  }
+
+  // 5T-Hoch/Tief Breakout
+  if (direction === "LONG" && d.currentPrice >= d.high5d * 0.99) {
+    trend += 3; reasons.push("Nahe/über 5T-Hoch (Breakout)");
+  }
+  if (direction === "SHORT" && d.currentPrice <= d.low5d * 1.01) {
+    trend += 3; reasons.push("Nahe/unter 5T-Tief (Breakout)");
+  }
+
+  trend = Math.min(trend, 15);
+
+  // --- VOLUMEN-GRUPPE — max +10% ---
+  if (d.volume) {
+    const ratio = d.volume.ratio;
+    if (ratio > 8.0) {
+      // Extrem hohes Volumen = wahrscheinlich News-getrieben, unberechenbar
+      volume += 3;
+      penalties -= 5;
+      reasons.push(`Volumen ${ratio}x extrem (News-Risiko)`);
+    } else if (ratio > 5.0) { volume += 10; reasons.push(`Volumen ${ratio}x sehr stark`); }
+    else if (ratio > 3.0) { volume += 7; reasons.push(`Volumen ${ratio}x stark`); }
+    else if (ratio > 1.5) { volume += 4; reasons.push(`Volumen ${ratio}x gut`); }
+    else if (ratio >= 1.0) { volume += 1; reasons.push(`Volumen ${ratio}x normal`); }
+    else { penalties -= 3; reasons.push(`Volumen ${ratio}x schwach`); }
+  }
+
+  volume = Math.min(volume, 10);
+
+  // --- PENALTIES ---
+
+  // SMA20 gegen Richtung
+  if ((direction === "LONG" && aboveSMA) || (direction === "SHORT" && belowSMA)) {
+    penalties -= 5; reasons.push("Gegen SMA20-Trend");
+  }
+
+  // ATR zu hoch = unberechenbarer Markt
+  if (d.atr14Percent !== null && d.atr14Percent > 5) {
+    penalties -= 5; reasons.push(`ATR ${d.atr14Percent}% sehr volatil`);
+  }
+
+  // MACD wächst bei RSI-Extrem in Gegenrichtung = Erschöpfung
+  if (d.rsi14 !== null && d.macd) {
+    const exhaustion = (direction === "LONG" && d.rsi14 > 75 && d.macd.histogram > 0)
+      || (direction === "SHORT" && d.rsi14 < 25 && d.macd.histogram < 0);
+    if (exhaustion) {
+      penalties -= 8;
+      reasons.push("Erschöpfungssignal (RSI-Extrem + starkes Momentum)");
+    }
+  }
+
+  const confidence = Math.max(40, Math.min(95, 45 + momentum + trend + volume + penalties));
+
+  return {
+    direction,
+    confidence,
+    components: { momentum, trend, volume, penalties },
+    reasons,
+    filtered: false,
+  };
+}
+
 // RSI berechnen (14 Perioden)
 function calculateRSI(closes: number[], period = 14): number | null {
   if (closes.length < period + 1) return null;
