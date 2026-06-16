@@ -632,7 +632,15 @@ export async function generateSignals(shortlist?: ScanCandidate[]): Promise<{
   console.log(`${marketData.length} Assets geladen. Technische Analyse im Code...`);
 
   // Pre-Analyse im Code (deterministisch)
-  const analyzed = preAnalyzeAssets(marketData);
+  let analyzed = preAnalyzeAssets(marketData);
+
+  // Fallback: Wenn Shortlist zu wenige Kandidaten liefert, volle Watchlist nutzen
+  if (analyzed.length < 2 && shortlist && marketData.length < allMarketData.length) {
+    console.log(`Nur ${analyzed.length} Kandidat(en) aus Shortlist — Fallback auf alle ${allMarketData.length} Assets`);
+    marketData = allMarketData;
+    analyzed = preAnalyzeAssets(allMarketData);
+  }
+
   console.log(`${analyzed.length} Assets bestehen Filter. Qualitative Prüfung via Claude...`);
 
   // 2. Claude API aufrufen
