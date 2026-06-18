@@ -447,6 +447,13 @@ function calculateSupportResistance(highs: number[], lows: number[]): { support:
   return { support, resistance };
 }
 
+// Einzelnes Asset per XTB-Ticker laden (für Manage-Endpoint)
+export async function fetchAssetByTicker(xbtTicker: string): Promise<AssetMarketData | null> {
+  const asset = WATCHLIST.find(w => w.ticker === xbtTicker);
+  if (!asset) return null;
+  return fetchSingleAsset(asset);
+}
+
 // Einzelnes Asset von Yahoo Finance laden
 async function fetchSingleAsset(asset: WatchlistAsset): Promise<AssetMarketData | null> {
   try {
