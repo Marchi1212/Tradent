@@ -24,7 +24,8 @@ export async function GET(request: Request) {
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: "Yahoo Finance nicht erreichbar" }, { status: 502 });
+      const text = await res.text().catch(() => "");
+      return NextResponse.json({ error: "Yahoo Finance nicht erreichbar", debug: { status: res.status, yahooSymbol, url, body: text.slice(0, 200) } }, { status: 502 });
     }
 
     const json = await res.json();
