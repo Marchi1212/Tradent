@@ -1,25 +1,10 @@
 import { NextResponse } from "next/server";
+import { WATCHLIST } from "@/lib/market-data";
 
-// Yahoo-Symbol Mapping (gleich wie in revalidate)
-const YAHOO_MAP: Record<string, string> = {
-  DE40: "^GDAXI", US500: "^GSPC", US100: "^NDX", US30: "^DJI",
-  UK100: "^FTSE", FRA40: "^FCHI", EU50: "^STOXX50E", JAP225: "^N225",
-  "TSLA.US": "TSLA", "NVDA.US": "NVDA", "AAPL.US": "AAPL",
-  "MSFT.US": "MSFT", "AMZN.US": "AMZN", "META.US": "META",
-  "GOOGL.US": "GOOGL", "AMD.US": "AMD", "NFLX.US": "NFLX",
-  "INTC.US": "INTC", "BA.US": "BA", "JPM.US": "JPM",
-  "GS.US": "GS", "DIS.US": "DIS", "KO.US": "KO",
-  "SAP.DE": "SAP.DE", "SIE.DE": "SIE.DE", "ASML.NL": "ASML.AS",
-  "LVMH.FR": "MC.PA", "VOW.DE": "VOW3.DE", "DBK.DE": "DBK.DE",
-  EURUSD: "EURUSD=X", GBPUSD: "GBPUSD=X", USDJPY: "USDJPY=X",
-  USDCHF: "USDCHF=X", EURGBP: "EURGBP=X", AUDUSD: "AUDUSD=X",
-  USDCAD: "USDCAD=X", NZDUSD: "NZDUSD=X",
-  GOLD: "GC=F", SILVER: "SI=F", PLATINUM: "PL=F",
-  "OIL.WTI": "CL=F", OIL: "BZ=F", NATGAS: "NG=F",
-  BITCOIN: "BTC-USD", ETHEREUM: "ETH-USD", SOLANA: "SOL-USD", RIPPLE: "XRP-USD",
-  CARDANO: "ADA-USD", POLKADOT: "DOT-USD", CHAINLINK: "LINK-USD", AVALANCHE: "AVAX-USD",
-  LITECOIN: "LTC-USD", DOGECOIN: "DOGE-USD", POLYGON: "MATIC-USD", UNISWAP: "UNI7083-USD",
-};
+const tickerToSymbol = new Map<string, string>();
+for (const w of WATCHLIST) {
+  tickerToSymbol.set(w.ticker, w.symbol);
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -29,7 +14,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "ticker Parameter fehlt" }, { status: 400 });
   }
 
-  const yahooSymbol = YAHOO_MAP[ticker] || ticker;
+  const yahooSymbol = tickerToSymbol.get(ticker) || ticker;
 
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1m&range=1d&includePrePost=false`;

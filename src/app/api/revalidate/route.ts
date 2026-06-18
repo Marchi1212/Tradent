@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { WATCHLIST } from "@/lib/market-data";
 
 export const maxDuration = 15;
 
-// Aktuellen Kurs von Yahoo Finance laden
+const tickerToSymbol = new Map<string, string>();
+for (const w of WATCHLIST) {
+  tickerToSymbol.set(w.ticker, w.symbol);
+}
+
 async function fetchCurrentPrice(yahooSymbol: string): Promise<number | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1m&range=1d&includePrePost=false`;
@@ -21,27 +26,6 @@ async function fetchCurrentPrice(yahooSymbol: string): Promise<number | null> {
   }
 }
 
-// Yahoo-Symbol aus XTB-Ticker
-const YAHOO_SYMBOLS: Record<string, string> = {
-  DE40: "^GDAXI", US500: "^GSPC", US100: "^NDX", US30: "^DJI",
-  UK100: "^FTSE", FRA40: "^FCHI", EU50: "^STOXX50E", JAP225: "^N225",
-  "TSLA.US": "TSLA", "NVDA.US": "NVDA", "AAPL.US": "AAPL",
-  "MSFT.US": "MSFT", "AMZN.US": "AMZN", "META.US": "META",
-  "GOOGL.US": "GOOGL", "AMD.US": "AMD", "NFLX.US": "NFLX",
-  "INTC.US": "INTC", "BA.US": "BA", "JPM.US": "JPM",
-  "GS.US": "GS", "DIS.US": "DIS", "KO.US": "KO",
-  "SAP.DE": "SAP.DE", "SIE.DE": "SIE.DE", "ASML.NL": "ASML.AS",
-  "LVMH.FR": "MC.PA", "VOW.DE": "VOW3.DE", "DBK.DE": "DBK.DE",
-  EURUSD: "EURUSD=X", GBPUSD: "GBPUSD=X", USDJPY: "USDJPY=X",
-  USDCHF: "USDCHF=X", EURGBP: "EURGBP=X", AUDUSD: "AUDUSD=X",
-  USDCAD: "USDCAD=X", NZDUSD: "NZDUSD=X",
-  GOLD: "GC=F", SILVER: "SI=F", PLATINUM: "PL=F",
-  "OIL.WTI": "CL=F", OIL: "BZ=F", NATGAS: "NG=F",
-  BITCOIN: "BTC-USD", ETHEREUM: "ETH-USD", SOLANA: "SOL-USD", RIPPLE: "XRP-USD",
-  CARDANO: "ADA-USD", POLKADOT: "DOT-USD", CHAINLINK: "LINK-USD", AVALANCHE: "AVAX-USD",
-  LITECOIN: "LTC-USD", DOGECOIN: "DOGE-USD", POLYGON: "MATIC-USD", UNISWAP: "UNI7083-USD",
-};
-
 // Rein mathematische Revalidierung – kein Claude-Call nötig
 export async function POST(request: Request) {
   try {
@@ -53,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     // 1. Aktuellen Kurs laden (kostenlos via Yahoo Finance)
-    const yahooSymbol = YAHOO_SYMBOLS[ticker] || ticker;
+    const yahooSymbol = tickerToSymbol.get(ticker) || ticker;
     const currentPrice = await fetchCurrentPrice(yahooSymbol);
 
     if (!currentPrice) {
