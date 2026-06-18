@@ -56,8 +56,8 @@ export async function GET(request: Request) {
             if (!sub.subscription) continue;
             try {
               const payload = JSON.stringify({
-                title: "Neue Signale verfügbar",
-                body: "Deine täglichen Trading-Signale sind bereit. Jetzt prüfen.",
+                title: "Markt-Check läuft",
+                body: "Vorschau wird erstellt — Signale kommen um 13:30.",
                 tag: "daily-morning",
               });
               await webPush.sendNotification(sub.subscription, payload);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getTodaySignals, saveTodaySignals, todaySignalsExist, getScanCandidates } from "@/lib/signal-store";
 import { generateSignals } from "@/lib/signal-generator";
 import { getTradingDayType } from "@/lib/market-hours";
+import webPush from "web-push";
 
 export const maxDuration = 60;
 
@@ -64,7 +65,45 @@ export async function GET() {
     // 6. Speichern
     await saveTodaySignals(generated);
 
-    // 7. Gespeicherte Signale zurückgeben
+    // 7. Push-Notification: "Signale sind da"
+    try {
+      const vapidPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+      if (vapidPublic && vapidPrivate) {
+        webPush.setVapidDetails("mailto:tradent@tradent-beta.vercel.app", vapidPublic, vapidPrivate);
+        const { createAdminClient } = await import("@/lib/supabase/admin");
+        const supabase = createAdminClient();
+        const { data: allSubs } = await supabase
+          .from("push_subscriptions")
+          .select("user_id, subscription");
+
+        if (allSubs) {
+          const steady = generated.find(s => s.riskClass === "steady");
+          const bold = generated.find(s => s.riskClass === "bold");
+          const assets = [steady?.asset, bold?.asset].filter(Boolean).join(" & ");
+
+          for (const sub of allSubs) {
+            if (!sub.subscription) continue;
+            try {
+              await webPush.sendNotification(sub.subscription, JSON.stringify({
+                title: "Signale sind da",
+                body: `${assets} — jetzt Trade prüfen.`,
+                tag: "daily-signals",
+              }));
+            } catch (err) {
+              const pushErr = err as { statusCode?: number };
+              if (pushErr.statusCode === 410) {
+                await supabase.from("push_subscriptions").delete().eq("user_id", sub.user_id);
+              }
+            }
+          }
+        }
+      }
+    } catch (pushErr) {
+      console.error("Signal-Push fehlgeschlagen:", pushErr);
+    }
+
+    // 8. Gespeicherte Signale zurückgeben
     const saved = await getTodaySignals();
     return NextResponse.json({ signals: saved });
   } catch (err) {
