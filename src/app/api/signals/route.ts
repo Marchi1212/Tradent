@@ -78,9 +78,7 @@ export async function GET() {
           .select("user_id, subscription");
 
         if (allSubs) {
-          const steady = generated.find(s => s.riskClass === "steady");
-          const bold = generated.find(s => s.riskClass === "bold");
-          const assets = [steady?.asset, bold?.asset].filter(Boolean).join(" & ");
+          const assets = [generated.steady?.asset, generated.bold?.asset].filter(Boolean).join(" & ");
 
           for (const sub of allSubs) {
             if (!sub.subscription) continue;
