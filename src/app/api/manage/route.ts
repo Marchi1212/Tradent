@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { WATCHLIST } from "@/lib/market-data";
 
 export const maxDuration = 30;
 
-// Trade Management: Prüft offene Trades alle 30 Min, gibt klare Handlungsempfehlung.
-// Cron-Aufruf alle 30 Min via cron-job.org.
+// XTB-Ticker → Yahoo-Symbol Mapping aus der Watchlist
+const tickerToSymbol = new Map<string, string>();
+for (const w of WATCHLIST) {
+  tickerToSymbol.set(w.ticker, w.symbol);
+}
+
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
@@ -33,24 +38,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ checked: 0 });
     }
 
+    // Signal-Ticker holen und in Yahoo-Symbole umwandeln
     const signalIds = [...new Set(openTrades.map(t => t.signal_id))];
     const { data: signals } = await supabase
       .from("signals")
       .select("id, ticker")
       .in("id", signalIds);
 
-    const tickerMap = new Map<string, string>();
+    const signalToYahoo = new Map<string, string>();
     for (const s of (signals || [])) {
-      tickerMap.set(s.id as string, s.ticker as string);
+      const xbtTicker = s.ticker as string;
+      const yahooSymbol = tickerToSymbol.get(xbtTicker) || xbtTicker;
+      signalToYahoo.set(s.id as string, yahooSymbol);
     }
 
-    const tickers = [...new Set(openTrades.map(t => tickerMap.get(t.signal_id)).filter(Boolean))] as string[];
+    // Kurse von Yahoo holen (mit Yahoo-Symbol, nicht XTB-Ticker)
+    const yahooSymbols = [...new Set([...signalToYahoo.values()])];
     const priceMap = new Map<string, number>();
 
-    for (const ticker of tickers) {
+    for (const symbol of yahooSymbols) {
       try {
         const res = await fetch(
-          `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`,
+          `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
           {
             headers: { "User-Agent": "Mozilla/5.0 (compatible; Tradent/1.0)" },
             signal: AbortSignal.timeout(5000),
@@ -59,7 +68,7 @@ export async function GET(request: Request) {
         if (res.ok) {
           const json = await res.json();
           const price = json.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if (price) priceMap.set(ticker, price);
+          if (price) priceMap.set(symbol, price);
         }
       } catch {
         // Preis nicht verfügbar — skip
@@ -68,9 +77,9 @@ export async function GET(request: Request) {
 
     let notified = 0;
     for (const trade of openTrades) {
-      const ticker = tickerMap.get(trade.signal_id);
-      if (!ticker) continue;
-      const currentPrice = priceMap.get(ticker);
+      const yahooSymbol = signalToYahoo.get(trade.signal_id);
+      if (!yahooSymbol) continue;
+      const currentPrice = priceMap.get(yahooSymbol);
       if (!currentPrice) continue;
 
       const slDistance = Math.abs(trade.entry - trade.stop_loss);
@@ -82,24 +91,34 @@ export async function GET(request: Request) {
       const tpDistance = Math.abs(trade.take_profit - trade.entry);
       const progressToTp = tpDistance > 0 ? priceDiff / tpDistance : 0;
 
+      // Wie weit zum Stop-Loss? (negativ = Richtung SL)
+      const progressToSl = slDistance > 0 ? -priceDiff / slDistance : 0;
+
       let title: string | null = null;
       let body: string | null = null;
 
       if (isCloseTime) {
-        // Ab 22:00: immer schließen, egal ob im Plus oder Minus
         const prefix = priceDiff >= 0 ? `+${profitPercent}%` : `${profitPercent}%`;
         title = `${trade.asset}: Jetzt schließen (${prefix})`;
         body = "Feierabend — Trade jetzt schließen. Kein Overnight-Risiko.";
       } else if (progressToTp >= 0.8) {
         title = `${trade.asset}: Jetzt schließen (+${profitPercent}%)`;
-        body = "Fast am Take-Profit — Trade jetzt schließen und Gewinn mitnehmen.";
+        body = "Fast am Take-Profit — Gewinn jetzt mitnehmen.";
       } else if (priceDiff >= slDistance) {
         title = `${trade.asset}: Stoploss anpassen (+${profitPercent}%)`;
         body = "Trade im Plus — öffne die App für Details.";
+      } else if (progressToSl >= 0.75) {
+        title = `${trade.asset}: Achtung (${profitPercent}%)`;
+        body = "75% zum Stop-Loss — Position prüfen, ggf. manuell schließen.";
+      } else if (progressToSl >= 0.5) {
+        title = `${trade.asset}: Im Minus (${profitPercent}%)`;
+        body = "Trade läuft gegen dich — beobachten oder Position reduzieren.";
       }
 
       if (title && body) {
-        const signalKey = isCloseTime ? `close-${trade.id}` : `manage-${trade.id}`;
+        const signalKey = isCloseTime
+          ? `close-${trade.id}`
+          : `manage-${trade.id}-${progressToSl >= 0.75 ? "warn75" : progressToSl >= 0.5 ? "warn50" : "profit"}`;
         await supabase.from("push_queue").upsert(
           {
             user_id: trade.user_id,
@@ -115,7 +134,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ checked: openTrades.length, notified });
+    return NextResponse.json({ checked: openTrades.length, notified, prices: yahooSymbols.length });
   } catch (err) {
     console.error("Manage-Check fehlgeschlagen:", err);
     return NextResponse.json(
