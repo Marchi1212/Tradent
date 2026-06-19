@@ -433,6 +433,12 @@ export async function closeTrade(
   if (updateError) throw updateError;
 }
 
+export async function deleteTrade(tradeId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("trades").delete().eq("id", tradeId);
+  if (error) throw error;
+}
+
 export async function deletePortfolio(id: string): Promise<void> {
   const supabase = createClient();
   const userId = await getUserId();

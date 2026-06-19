@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Signal } from "@/lib/mock-signals";
 import type { Portfolio } from "@/lib/portfolio-store";
-import { getOpenTradeForSignal, getTradeForSignal, closeTrade, type Trade } from "@/lib/portfolio-store";
+import { getOpenTradeForSignal, getTradeForSignal, closeTrade, deleteTrade, type Trade } from "@/lib/portfolio-store";
 import { getMarketInfo, formatTimer } from "@/lib/market-hours";
 import { scheduleCloseNotification, cancelCloseNotification } from "@/lib/notifications";
 import { queueCloseReminder, unqueueCloseReminder, unqueueEntryReminder } from "@/lib/push-queue";
@@ -661,6 +661,29 @@ export default function SignalCard({
                   <p className={`text-sm ${c.textSec} leading-relaxed mt-2`}>{signal.reasoning}</p>
                 )}
               </div>
+
+              {/* Erneut eröffnen — nur wenn Markt noch offen */}
+              {marketInfo.isOpen && !signalInvalid && (
+                <div className={`pt-4 border-t ${c.border}`}>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!openTrade) return;
+                      try {
+                        await deleteTrade(openTrade.id);
+                        setPositionClosed(false);
+                        setOpenTrade(null);
+                        setCloseResult(null);
+                      } catch (err) {
+                        console.error("Trade löschen fehlgeschlagen:", err);
+                      }
+                    }}
+                    className={`w-full rounded-[6px] py-3 text-sm font-bold transition-colors ${c.btnOutline}`}
+                  >
+                    Erneut eröffnen
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             /* ── Offene / Neue Position: volle Details ── */
