@@ -8,13 +8,7 @@ export const maxDuration = 60;
 
 export async function GET() {
   try {
-    // 1. Prüfen ob heute schon finale Signale existieren
-    const existing = await getTodaySignals();
-    if (existing) {
-      return NextResponse.json({ signals: existing });
-    }
-
-    // 2. Zeitpunkt + Tagestyp prüfen
+    // 1. Zeitpunkt + Tagestyp prüfen — IMMER zuerst, auch wenn Signale existieren
     const now = new Date();
     const cetStr = now.toLocaleString("en-US", { timeZone: "Europe/Berlin" });
     const cet = new Date(cetStr);
@@ -22,8 +16,6 @@ export async function GET() {
     const dayType = getTradingDayType(cet);
     const isWeekendDay = dayType === "weekend";
 
-    // Wochentag: Zwei-Stufen-System — finale Signale erst ab 13:30
-    // WE: 08:00, Feiertage: 08:30 (Single-Generierung wie bisher)
     let minMinutes: number;
     if (dayType === "weekday") {
       minMinutes = 13 * 60 + 30; // 13:30 CET
@@ -33,10 +25,17 @@ export async function GET() {
       minMinutes = 8 * 60 + 30; // 08:30 (Feiertage)
     }
 
+    // Vor der Mindestzeit: nur Vorschau, nie finale Signale
     if (currentMinutes < minMinutes) {
       const waitUntil = dayType === "weekday" ? "13:30"
         : isWeekendDay ? "08:00" : "08:30";
       return NextResponse.json({ waitUntil, isWeekend: isWeekendDay });
+    }
+
+    // 2. Prüfen ob heute schon finale Signale existieren (nur nach Zeitcheck!)
+    const existing = await getTodaySignals();
+    if (existing) {
+      return NextResponse.json({ signals: existing });
     }
 
     // 3. Double-Check gegen Race Conditions

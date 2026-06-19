@@ -1,9 +1,22 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get("action");
   const supabase = createAdminClient();
   const today = new Date().toISOString().split("T")[0];
+
+  if (action === "delete-today") {
+    const { data: deleted, error } = await supabase
+      .from("signals")
+      .delete()
+      .eq("date", today)
+      .eq("session", "daily")
+      .select("id, asset");
+
+    return NextResponse.json({ deleted: deleted || [], error: error?.message });
+  }
 
   const { data: signals } = await supabase
     .from("signals")
