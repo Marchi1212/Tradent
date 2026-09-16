@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "pitchdeck",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8123", "-d", "/Users/gimenezmarkus/Library/Mobile Documents/com~apple~CloudDocs/_MyWork/_DEV/eb-konzept-personal"],
+      "port": 8123
+    },
+    {
+      "name": "eb-konzept",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8090", "-d", "/Users/gimenezmarkus/Library/Mobile Documents/com~apple~CloudDocs/_MyWork/_DEV/eb-konzept"],
+      "port": 8090
     }
   ]
 }
