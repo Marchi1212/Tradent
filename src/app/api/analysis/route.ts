@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const TEMP_KEY = "v2review_9f8a2b1c";
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const secret = url.searchParams.get("key");
-  if (secret !== TEMP_KEY) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+export async function GET(request: NextRequest) {
+  const key = request.nextUrl.searchParams.get("key");
+  if (key !== TEMP_KEY) {
+    return NextResponse.json({ error: "unauthorized", got: key }, { status: 401 });
   }
 
   const supabase = createAdminClient();
